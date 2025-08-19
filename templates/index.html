@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DI SCHEDULING</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <div class="header-left">
+                <button id="board-toggle-btn" title="공유 게시판 열기">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M20 22H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1zm-1-2V4H5v16h14zM7 6h4v4H7V6zm0 6h10v2H7v-2zm0 4h10v2H7v-2zm6-8h4v4h-4V6z"></path></svg>
+                </button>
+                <h1>DI SCHEDULING</h1>
+            </div>
+            <div class="user-profile-area">
+                <div id="current-user-icon" class="current-user-icon"></div>
+                <div id="user-popup" class="user-popup">
+                    <ul id="user-popup-list" class="user-popup-list"></ul>
+                    <div class="user-add-form">
+                        <input type="text" id="new-user-name" placeholder="새 팀원 이름">
+                        <button id="add-user-btn">추가</button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <section class="controls">
+            <button id="add-project-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20px" height="20px"><path d="M11 11V5h2v6h6v2h-6v6h-2v-6H5v-2h6z"></path></svg>
+                <span>새 프로젝트</span>
+            </button>
+        </section>
+
+        <div class="main-content">
+            <div id="project-list-wrapper">
+                <main id="project-list" class="project-list"></main>
+                <section id="completed-projects-section" style="display: none;">
+                    <h2>종료된 프로젝트</h2>
+                    <div id="completed-project-list" class="project-list"></div>
+                </section>
+            </div>
+            <section id="calendar-container">
+                <div id="calendar"></div>
+            </section>
+        </div>
+    </div>
+
+    <aside id="board-sidebar">
+        <div class="sidebar-header">
+            <h2>공유 게시판</h2>
+            <button id="close-sidebar-btn">&times;</button>
+        </div>
+        <div id="post-list" class="sidebar-content"></div>
+        <div class="sidebar-footer">
+            <button id="new-post-btn">새 글 작성</button>
+        </div>
+    </aside>
+    <div id="sidebar-backdrop"></div>
+
+    <dialog id="post-modal">
+        <form id="post-form">
+            <h3 id="post-modal-title">새 글 작성</h3>
+            <input type="hidden" id="post-id-input">
+            <input type="text" id="post-title-input" placeholder="제목을 입력하세요" required>
+            <textarea id="post-content-textarea" placeholder="내용을 입력하세요" required></textarea>
+            <div class="form-buttons">
+                <button type="button" id="close-post-modal-btn" class="cancel-btn">취소</button>
+                <button type="submit">저장</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog id="post-view-modal">
+        <div id="post-view-content">
+            <h2 id="post-view-title"></h2>
+            <p id="post-view-meta"></p>
+            <div id="post-view-body"></div>
+            <div class="post-view-buttons">
+                <button type="button" id="edit-post-btn">수정</button>
+                <button type="button" id="delete-post-btn">삭제</button>
+                <button type="button" id="close-post-view-modal-btn">닫기</button>
+            </div>
+        </div>
+    </dialog>
+
+    <dialog id="project-modal">
+        <form id="project-form">
+             <h3>새 프로젝트 생성</h3>
+             <input type="text" id="project-name-input" placeholder="프로젝트 이름" required>
+             <select id="project-user-select" required></select>
+             <select id="project-priority-select" required>
+                 <option value="" disabled selected>우선순위 선택</option>
+                 <option value="1">높음</option>
+                 <option value="2">보통</option>
+                 <option value="3">낮음</option>
+             </select>
+             <input type="date" id="project-start-date" required title="시작일">
+             <input type="date" id="project-deadline" required title="마감일">
+             <div id="modal-task-list"></div>
+             <button type="button" id="add-task-field-btn">세부 업무 추가</button>
+             <div class="form-buttons">
+                 <button type="button" id="close-modal-btn" class="cancel-btn">취소</button>
+                 <button type="submit">생성</button>
+             </div>
+        </form>
+    </dialog>
+
+    <dialog id="details-modal">
+        <div class="details-modal-content">
+            <div class="details-modal-left">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3 id="details-modal-title" style="margin: 0;"></h3>
+                    <select id="details-priority-select">
+                        <option value="1">우선순위: 높음</option>
+                        <option value="2">우선순위: 보통</option>
+                        <option value="3">우선순위: 낮음</option>
+                    </select>
+                </div>
+                <h4>
+                     <span>세부 업무</span>
+                     <button id="add-detail-task-btn">
+                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M11 11V5h2v6h6v2h-6v6h-2v-6H5v-2h6z"></path></svg>
+                             <span>업무 추가</span>
+                     </button>
+                </h4>
+                <div id="details-task-list" class="task-list-popup"></div>
+                <div class="comments-section">
+                    <h4>코멘트</h4>
+                    <div id="comments-list"></div>
+                    <div class="comment-form">
+                        <textarea id="comment-input" placeholder="코멘트를 입력하세요..." rows="2"></textarea>
+                        <button id="add-comment-btn">등록</button>
+                    </div>
+                </div>
+            </div>
+            <div class="details-modal-right">
+                <div id="project-calendar"></div>
+            </div>
+        </div>
+        <div id="details-modal-footer">
+            <button type="button" id="close-details-modal-btn">닫기</button>
+            <div class="footer-buttons-right">
+                <button type="button" id="delete-project-btn">프로젝트 삭제</button>
+                <button type="button" id="restore-project-btn">프로젝트 되살리기</button>
+                <button type="button" id="complete-project-btn">프로젝트 종료</button>
+            </div>
+            <button type="button" id="confirm-delete-btn" style="display: none;">삭제 최종 확인</button>
+        </div>
+    </dialog>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
