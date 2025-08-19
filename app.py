@@ -195,10 +195,9 @@ def create_user():
     conn = get_db_connection()
     try:
         with conn, conn.cursor() as cur:
-            cur.execute("INSERT INTO Users(name) VALUES (%s) ON CONFLICT (name) DO NOTHING RETURNING id", (name,))
-            res = cur.fetchone()
-            new_id = res['id'] if res else None
-        return jsonify({'status': 'success', 'id': new_id}), 201
+            cur.execute("INSERT INTO Users(name) VALUES (%s) ON CONFLICT (name) DO NOTHING RETURNING *", (name,))
+            new_user = cur.fetchone()
+        return jsonify(new_user), 201
     finally:
         conn.close()
 
@@ -234,7 +233,12 @@ def create_project():
                 rows = [(project_id, t['content'], _parse_date(t.get('deadline'))) for t in tasks if t.get('content')]
                 if rows:
                     psycopg2.extras.execute_batch(cur, "INSERT INTO Tasks (project_id, content, deadline) VALUES (%s,%s,%s)", rows)
-        return jsonify({'status': 'success', 'id': project_id}), 201
+            
+            cur.execute("SELECT * FROM Projects WHERE id = %s", (project_id,))
+            new_project = cur.fetchone()
+            new_project['tasks'] = []
+            new_project['comments'] = []
+        return jsonify(new_project), 201
     finally:
         conn.close()
 
@@ -257,7 +261,9 @@ def update_project(project_id):
     try:
         with conn, conn.cursor() as cur:
             cur.execute(f"UPDATE Projects SET {', '.join(fields)} WHERE id=%s", tuple(params))
-        return jsonify({'status': 'success'})
+            cur.execute("SELECT * FROM Projects WHERE id = %s", (project_id,))
+            updated_project = cur.fetchone()
+        return jsonify(updated_project)
     finally:
         conn.close()
 
@@ -291,9 +297,9 @@ def create_task(project_id):
     conn = get_db_connection()
     try:
         with conn, conn.cursor() as cur:
-            cur.execute("INSERT INTO Tasks (project_id, content) VALUES (%s,%s) RETURNING id", (project_id, content))
-            task_id = cur.fetchone()['id']
-        return jsonify({'status': 'success', 'id': task_id}), 201
+            cur.execute("INSERT INTO Tasks (project_id, content) VALUES (%s,%s) RETURNING *", (project_id, content))
+            new_task = cur.fetchone()
+        return jsonify(new_task), 201
     finally:
         conn.close()
 
@@ -316,7 +322,9 @@ def update_task(task_id):
     try:
         with conn, conn.cursor() as cur:
             cur.execute(f"UPDATE Tasks SET {', '.join(fields)} WHERE id=%s", tuple(params))
-        return jsonify({'status':'success'})
+            cur.execute("SELECT * FROM Tasks WHERE id = %s", (task_id,))
+            updated_task = cur.fetchone()
+        return jsonify(updated_task)
     finally:
         conn.close()
 
@@ -341,9 +349,9 @@ def create_comment(project_id):
     conn = get_db_connection()
     try:
         with conn, conn.cursor() as cur:
-            cur.execute("INSERT INTO Comments (project_id, author_name, content) VALUES (%s,%s,%s) RETURNING id", (project_id, author_name, content))
-            cid = cur.fetchone()['id']
-        return jsonify({'status': 'success', 'id': cid}), 201
+            cur.execute("INSERT INTO Comments (project_id, author_name, content) VALUES (%s,%s,%s) RETURNING *", (project_id, author_name, content))
+            new_comment = cur.fetchone()
+        return jsonify(new_comment), 201
     finally:
         conn.close()
 
@@ -370,7 +378,10 @@ def create_post():
             cur.execute("INSERT INTO Posts (title, content, user_id) VALUES (%s,%s,%s) RETURNING id", (data['title'], data['content'], data['user_id']))
             post_id = cur.fetchone()['id']
             cur.execute("INSERT INTO PostReadStatus (user_id, post_id) VALUES (%s,%s) ON CONFLICT DO NOTHING", (data['user_id'], post_id))
-        return jsonify({'status':'success','id':post_id}), 201
+            
+            cur.execute("SELECT p.*, u.name as author_name FROM Posts p JOIN Users u ON p.user_id = u.id WHERE p.id = %s", (post_id,))
+            new_post = cur.fetchone()
+        return jsonify(new_post), 201
     finally:
         conn.close()
 
@@ -384,7 +395,9 @@ def update_post(post_id):
     try:
         with conn, conn.cursor() as cur:
             cur.execute("UPDATE Posts SET title=%s, content=%s, updated_at=NOW() WHERE id=%s", (data['title'], data['content'], post_id))
-        return jsonify({'status':'success'})
+            cur.execute("SELECT p.*, u.name as author_name FROM Posts p JOIN Users u ON p.user_id = u.id WHERE p.id = %s", (post_id,))
+            updated_post = cur.fetchone()
+        return jsonify(updated_post)
     finally:
         conn.close()
 

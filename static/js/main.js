@@ -59,10 +59,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- 2. 초기화 및 데이터 갱신 ---
     async function initializeApp() {
         const savedUserId = localStorage.getItem('currentSchedulerUser');
-        setupEventListeners();
+        setupEventListeners(); 
         await refreshDataAndRender(savedUserId);
     }
-
+    
     async function refreshDataAndRender(savedUserId = null) {
         try {
             const headers = {};
@@ -70,32 +70,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers['X-Current-User-ID'] = currentUser.id;
             }
             const response = await fetch('/api/data', { headers });
-            if (!response.ok) {
-                throw new Error(`API 요청 실패: ${response.status}`);
-            }
+            if (!response.ok) throw new Error(`API 요청 실패: ${response.status}`);
             appData = await response.json();
-
+            
             if (savedUserId && appData.users.some(u => u.id == savedUserId)) {
                 currentUser = appData.users.find(u => u.id == savedUserId);
             } else if ((!currentUser || !appData.users.some(u => u.id === currentUser.id)) && appData.users.length > 0) {
                 currentUser = appData.users[0];
             }
 
-            renderCurrentUserIcon();
-            renderProjects();
-            initializeCalendar();
-            renderSidebar();
-
-            if (appData.has_new_posts) {
-                boardToggleBtn.classList.add('has-notification');
-            } else {
-                boardToggleBtn.classList.remove('has-notification');
-            }
-
-            if (detailsModal.open) {
-                renderDetailsModal();
-            }
+            renderAll();
         } catch (error) { console.error('데이터 갱신 실패:', error); }
+    }
+    
+    function renderAll() {
+        renderCurrentUserIcon();
+        renderProjects();
+        initializeCalendar();
+        renderSidebar();
+        
+        if (appData.has_new_posts) {
+            boardToggleBtn.classList.add('has-notification');
+        } else {
+            boardToggleBtn.classList.remove('has-notification');
+        }
+
+        if (detailsModal.open) {
+            renderDetailsModal();
+        }
     }
 
     // --- 3. 렌더링 함수 ---
@@ -131,13 +133,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentUser && project.user_id === currentUser.id) {
             projectEl.classList.add('is-mine');
         }
-
+        
         const projectColors = getProjectColor(project.id);
         projectEl.style.backgroundColor = 'var(--color-surface)';
         projectEl.style.borderLeftColor = projectColors.main;
-
+        
         const dDayData = calculateDday(project.deadline);
-
+        
         let progressDisplayHTML = '';
         if (project.tasks.length > 0) {
             progressDisplayHTML = `
@@ -192,11 +194,11 @@ document.addEventListener('DOMContentLoaded', () => {
             completedProjectsSection.style.display = 'none';
         }
     }
-
+    
     function renderDetailsModal() {
         const project = appData.projects.find(p => p.id === currentOpenProjectId);
         if (!project) {
-            detailsModal.close();
+            detailsModal.close(); 
             return;
         };
 
@@ -204,7 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
         rightButtons.style.display = 'flex';
         confirmDeleteBtn.style.display = 'none';
         deleteProjectBtn.style.display = 'block';
-
+        
         if (project.status === 'completed') {
             completeProjectBtn.style.display = 'none';
             restoreProjectBtn.style.display = 'block';
@@ -240,7 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
             textarea.addEventListener('input', autoResizeTextarea);
             autoResizeTextarea({ target: textarea });
         });
-
+        
         commentsList.innerHTML = '';
         project.comments.forEach(comment => {
             const commentEl = document.createElement('div');
@@ -287,15 +289,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const projectColors = getProjectColor(project.id);
             const assignee = appData.users.find(u => u.id === project.user_id);
             const assigneeName = assignee ? ` ${assignee.name}` : '';
-            events.push({
-                title: `[P${assigneeName}] ${project.name}`,
-                start: formatDateToYYYYMMDD(project.start_date),
-                end: formatDateToYYYYMMDD(project.deadline),
-                backgroundColor: projectColors.main,
-                borderColor: projectColors.main
+            events.push({ 
+                title: `[P${assigneeName}] ${project.name}`, 
+                start: formatDateToYYYYMMDD(project.start_date), 
+                end: formatDateToYYYYMMDD(project.deadline), 
+                backgroundColor: projectColors.main, 
+                borderColor: projectColors.main 
             });
-            project.tasks.forEach(task => {
-                if (task.deadline) {
+            project.tasks.forEach(task => { 
+                if(task.deadline) { 
                     events.push({ title: `[업무] ${task.content}`, start: formatDateToYYYYMMDD(task.deadline), allDay: true, backgroundColor: '#6c757d' });
                 }
             });
@@ -312,8 +314,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function initializeProjectCalendar(project) {
         const events = [];
-        project.tasks.forEach(task => {
-            if (task.deadline) {
+        project.tasks.forEach(task => { 
+            if(task.deadline) { 
                 events.push({ title: task.content, start: formatDateToYYYYMMDD(task.deadline), allDay: true, backgroundColor: getProjectColor(project.id).main });
             }
         });
@@ -330,17 +332,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- 4. 이벤트 리스너 설정 ---
     function setupEventListeners() {
-        // 사용자 UI
         currentUserIcon.addEventListener('click', (e) => { e.stopPropagation(); const isHidden = userPopup.style.display === 'none' || userPopup.style.display === ''; if (isHidden) { renderUserPopup(); userPopup.style.display = 'block'; } else { userPopup.style.display = 'none'; } });
         document.addEventListener('click', (e) => { if (!userPopup.contains(e.target) && !currentUserIcon.contains(e.target)) { userPopup.style.display = 'none'; } });
-        userPopupList.addEventListener('click', async (e) => { if (e.target.classList.contains('delete-user-btn')) { if (confirm('정말로 이 사용자를 삭제하시겠습니까?')) await handleUserDelete(e.target.dataset.userId); } else { const userLi = e.target.closest('li'); if (userLi) handleUserSwitch(userLi.dataset.userId); } });
+        userPopupList.addEventListener('click', (e) => { if (e.target.classList.contains('delete-user-btn')) { handleUserDelete(e.target.dataset.userId); } else { const userLi = e.target.closest('li'); if (userLi) handleUserSwitch(userLi.dataset.userId); } });
         addUserBtn.addEventListener('click', handleUserAdd);
-
-        // 프로젝트 리스트 클릭
         projectListEl.addEventListener('click', openDetailsModal);
         completedProjectListEl.addEventListener('click', openDetailsModal);
-
-        // 상세 모달 이벤트
         closeDetailsModalBtn.addEventListener('click', () => detailsModal.close());
         completeProjectBtn.addEventListener('click', handleCompleteProject);
         restoreProjectBtn.addEventListener('click', handleRestoreProject);
@@ -350,23 +347,17 @@ document.addEventListener('DOMContentLoaded', () => {
         detailsDeadlineInput.addEventListener('change', handleDeadlineChange);
         detailsTaskList.addEventListener('change', (e) => { if (e.target.type === 'range') updateProgress('task', e.target.dataset.taskId, e.target.value); if (e.target.classList.contains('deadline-input')) handleTaskDeadlineEdit(e.target.dataset.taskId, e.target.value); });
         detailsTaskList.addEventListener('focusout', (e) => { if (e.target.classList.contains('task-content-input')) handleTaskContentEdit(e.target.dataset.taskId, e.target.value); });
-        detailsTaskList.addEventListener('click', (e) => { if (e.target.classList.contains('delete-task-btn')) { if (confirm('이 업무를 삭제하시겠습니까?')) handleTaskDelete(e.target.dataset.taskId); } });
+        detailsTaskList.addEventListener('click', (e) => { if (e.target.classList.contains('delete-task-btn')) { handleTaskDelete(e.target.dataset.taskId); } });
         addCommentBtn.addEventListener('click', handleAddComment);
-        commentsList.addEventListener('click', (e) => { if (e.target.classList.contains('delete-comment-btn')) { const commentItem = e.target.closest('.comment-item'); if (confirm('이 코멘트를 삭제하시겠습니까?')) handleCommentDelete(commentItem.dataset.commentId); } if (e.target.classList.contains('edit-comment-btn')) { const commentItem = e.target.closest('.comment-item'); const currentContent = commentItem.querySelector('.comment-text-content span:last-child').textContent; const newContent = prompt('코멘트를 수정하세요:', currentContent); if (newContent && newContent.trim() !== currentContent) { handleCommentEdit(commentItem.dataset.commentId, newContent.trim()); } } });
+        commentsList.addEventListener('click', (e) => { if (e.target.classList.contains('delete-comment-btn')) { handleCommentDelete(e.target.dataset.commentId); } if (e.target.classList.contains('edit-comment-btn')) { const commentItem = e.target.closest('.comment-item'); const currentContent = commentItem.querySelector('.comment-text-content span:last-child').textContent; const newContent = prompt('코멘트를 수정하세요:', currentContent); if (newContent && newContent.trim() !== currentContent) { handleCommentEdit(commentItem.dataset.commentId, newContent.trim()); } } });
         detailsModalTitle.addEventListener('click', handleTitleEdit);
         addDetailTaskBtn.addEventListener('click', handleAddNewTaskInDetail);
-
-        // 수동 진행도 슬라이더 이벤트
         projectListEl.addEventListener('change', (e) => { if (e.target.classList.contains('manual-progress-slider')) { updateProgress('project', e.target.dataset.projectId, e.target.value); } });
-
-        // 프로젝트 추가 모달
         addProjectBtn.addEventListener('click', openProjectModal);
         closeModalBtn.addEventListener('click', () => projectModal.close());
         addTaskFieldBtn.addEventListener('click', addModalTaskField);
         modalTaskListEl.addEventListener('click', (e) => { if (e.target.classList.contains('delete-task-btn')) e.target.parentElement.remove(); });
         projectForm.addEventListener('submit', handleFormSubmit);
-
-        // 게시판
         boardToggleBtn.addEventListener('click', toggleSidebar);
         closeSidebarBtn.addEventListener('click', toggleSidebar);
         sidebarBackdrop.addEventListener('click', toggleSidebar);
@@ -377,18 +368,13 @@ document.addEventListener('DOMContentLoaded', () => {
         closePostViewModalBtn.addEventListener('click', () => postViewModal.close());
         editPostBtn.addEventListener('click', handleEditPostBtnClick);
         deletePostBtn.addEventListener('click', handleDeletePost);
-
-        // 팝업 외부 클릭 시 닫기
-        [projectModal, detailsModal, postModal, postViewModal].forEach(modal => {
-            modal.addEventListener('click', (e) => { if (e.target === modal) modal.close(); });
-        });
+        [projectModal, detailsModal, postModal, postViewModal].forEach(modal => { modal.addEventListener('click', (e) => { if (e.target === modal) modal.close(); }); });
     }
-
+    
+  
     // --- 5. 이벤트 핸들러 & 로직 ---
     function openDetailsModal(e) {
-        if (e.target.classList.contains('manual-progress-slider')) {
-            return;
-        }
+        if (e.target.classList.contains('manual-progress-slider')) return;
         const projectItem = e.target.closest('.project-item');
         if (projectItem) {
             currentOpenProjectId = parseInt(projectItem.dataset.projectId);
@@ -396,31 +382,359 @@ document.addEventListener('DOMContentLoaded', () => {
             detailsModal.showModal();
             setTimeout(() => {
                 projectCalendar.render();
-                document.querySelectorAll('#details-task-list .task-content-input').forEach(textarea => {
-                    autoResizeTextarea({ target: textarea });
-                });
+                document.querySelectorAll('#details-task-list .task-content-input').forEach(textarea => autoResizeTextarea({ target: textarea }));
             }, 0);
         }
     }
 
-    async function handlePriorityChange(e) {
-        const newPriority = e.target.value;
-        await fetch(`/api/project/${currentOpenProjectId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ priority: parseInt(newPriority) })
-        });
-        await refreshDataAndRender();
+    function handleUserSwitch(userId) {
+        localStorage.setItem('currentSchedulerUser', userId);
+        currentUser = appData.users.find(u => u.id === parseInt(userId));
+        userPopup.style.display = 'none';
+        renderCurrentUserIcon();
+        renderProjects();
     }
 
+    async function handleUserAdd() {
+        const name = newUserNameInput.value.trim();
+        if (!name) return;
+        try {
+            const response = await fetch('/api/user', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+            if (!response.ok) throw new Error('Server error');
+            const newUser = await response.json();
+            if (newUser) {
+                appData.users.push(newUser);
+                newUserNameInput.value = '';
+                renderUserPopup();
+            }
+        } catch (error) {
+            alert('사용자 추가에 실패했습니다.');
+        }
+    }
+
+    async function handleUserDelete(userId) {
+        if (!confirm('정말로 이 사용자를 삭제하시겠습니까?')) return;
+        const originalUsers = [...appData.users];
+        const userToDelete = appData.users.find(u => u.id == userId);
+        
+        appData.users = appData.users.filter(u => u.id != userId);
+        renderUserPopup();
+        if (currentUser?.id == userId) {
+            currentUser = appData.users.length > 0 ? appData.users[0] : null;
+            if(currentUser) localStorage.setItem('currentSchedulerUser', currentUser.id);
+            else localStorage.removeItem('currentSchedulerUser');
+            renderAll();
+        }
+
+        try {
+            const response = await fetch(`/api/user/${userId}`, { method: 'DELETE' });
+            if (!response.ok) throw new Error('Server error');
+        } catch (error) {
+            alert('사용자 삭제에 실패했습니다. 원래대로 복구합니다.');
+            appData.users = originalUsers;
+            if(userToDelete && currentUser?.id != userToDelete.id) {
+                 currentUser = appData.users.find(u => u.id === currentUser.id);
+            }
+            renderAll();
+        }
+    }
+
+    async function handleAddComment() {
+        const text = commentInput.value.trim();
+        if (!text || !currentOpenProjectId) return;
+        
+        const newCommentData = { author_name: currentUser.name, content: text };
+        commentInput.value = '';
+    
+        try {
+            const response = await fetch(`/api/project/${currentOpenProjectId}/comment`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newCommentData) });
+            if (!response.ok) throw new Error('Server error');
+            const newComment = await response.json();
+            const project = appData.projects.find(p => p.id === currentOpenProjectId);
+            if (project) {
+                project.comments.push(newComment);
+            }
+            renderDetailsModal();
+        } catch(error) {
+            alert('코멘트 추가에 실패했습니다.');
+            commentInput.value = text; // 롤백
+        }
+    }
+    
+    async function handleTaskDelete(taskId) {
+        if (!confirm('이 업무를 삭제하시겠습니까?')) return;
+        const project = appData.projects.find(p => p.tasks.some(t => t.id == taskId));
+        if(!project) return;
+        const originalTasks = [...project.tasks];
+        project.tasks = project.tasks.filter(t => t.id != taskId);
+        renderDetailsModal();
+        try {
+            const response = await fetch(`/api/task/${taskId}`, { method: 'DELETE' });
+            if(!response.ok) throw new Error('Server error');
+        } catch(error) {
+            alert('업무 삭제에 실패했습니다.');
+            project.tasks = originalTasks;
+            renderDetailsModal();
+        }
+    }
+
+    async function handleCommentDelete(commentId) {
+        if (!confirm('이 코멘트를 삭제하시겠습니까?')) return;
+        
+        const project = appData.projects.find(p => p.comments.some(c => c.id == commentId));
+        if(!project) return;
+        const originalComments = [...project.comments];
+        project.comments = project.comments.filter(c => c.id != commentId);
+        renderDetailsModal();
+
+        try {
+            const response = await fetch(`/api/comment/${commentId}`, { method: 'DELETE' });
+            if(!response.ok) throw new Error('Server error');
+        } catch(error) {
+            alert('코멘트 삭제에 실패했습니다.');
+            project.comments = originalComments;
+            renderDetailsModal();
+        }
+    }
+
+    async function handleCompleteProject() {
+        if (!confirm('이 프로젝트를 종료 처리하시겠습니까?')) return;
+        const project = appData.projects.find(p => p.id === currentOpenProjectId);
+        if(!project) return;
+        
+        const originalStatus = project.status;
+        project.status = 'completed';
+        renderAll();
+        detailsModal.close();
+
+        try {
+            const response = await fetch(`/api/project/${currentOpenProjectId}/status`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'completed' }) });
+            if (!response.ok) throw new Error('Server error');
+        } catch (error) {
+            alert("프로젝트 종료 처리에 실패했습니다.");
+            project.status = originalStatus;
+            renderAll();
+        }
+    }
+    
+    async function handleRestoreProject() {
+        if (!confirm('이 프로젝트를 다시 활성화하시겠습니까?')) return;
+        const project = appData.projects.find(p => p.id === currentOpenProjectId);
+        if(!project) return;
+
+        const originalStatus = project.status;
+        project.status = 'active';
+        renderAll();
+        detailsModal.close();
+
+        try {
+            const response = await fetch(`/api/project/${currentOpenProjectId}/status`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'active' }) });
+            if (!response.ok) throw new Error('Server error');
+        } catch (error) {
+            alert("프로젝트 되살리기에 실패했습니다.");
+            project.status = originalStatus;
+            renderAll();
+        }
+    }
+    
+    function enterDeleteConfirmationMode() {
+        const rightButtons = document.querySelector('.footer-buttons-right');
+        rightButtons.style.display = 'none';
+        deleteProjectBtn.style.display = 'none';
+        confirmDeleteBtn.style.display = 'block';
+        confirmDeleteBtn.style.marginLeft = 'auto';
+    }
+
+    async function handleConfirmProjectDelete() {
+        const project = appData.projects.find(p => p.id === currentOpenProjectId);
+        if (!project) return;
+        
+        const projectIndex = appData.projects.findIndex(p => p.id === currentOpenProjectId);
+        if (projectIndex === -1) return;
+        
+        const originalProjects = [...appData.projects];
+        appData.projects.splice(projectIndex, 1);
+        renderAll();
+        detailsModal.close();
+
+        try {
+            const response = await fetch(`/api/project/${project.id}`, { method: 'DELETE' });
+            if(!response.ok) throw new Error('Server error');
+            alert('프로젝트가 성공적으로 삭제되었습니다.');
+        } catch (error) {
+            alert('프로젝트 삭제에 실패했습니다.');
+            appData.projects = originalProjects;
+            renderAll();
+        }
+    }
+    
+    async function handleFormSubmit(e) {
+         e.preventDefault();
+         const tasks = [];
+         document.querySelectorAll('#modal-task-list > div').forEach(field => {
+             const content = field.querySelector('.task-content-input').value.trim();
+             if (content) {
+                 tasks.push({ content, deadline: field.querySelector('.modal-task-deadline').value || null });
+             }
+         });
+         const newProjectData = { name: document.getElementById('project-name-input').value, user_id: parseInt(document.getElementById('project-user-select').value), priority: parseInt(document.getElementById('project-priority-select').value), start_date: document.getElementById('project-start-date').value, deadline: document.getElementById('project-deadline').value, tasks };
+         
+        try {
+            const response = await fetch('/api/project', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newProjectData) });
+            if (!response.ok) throw new Error('Server error');
+            const newProject = await response.json();
+            appData.projects.push(newProject);
+            renderAll();
+            projectModal.close();
+        } catch (error) {
+            alert('프로젝트 생성에 실패했습니다.');
+        }
+    }
+
+    async function handlePriorityChange(e) {
+        const newPriority = parseInt(e.target.value);
+        const project = appData.projects.find(p => p.id === currentOpenProjectId);
+        if (!project || project.priority === newPriority) return;
+        
+        const originalPriority = project.priority;
+        project.priority = newPriority;
+        renderProjects();
+        
+        try {
+            const response = await fetch(`/api/project/${currentOpenProjectId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ priority: newPriority }) });
+            if (!response.ok) throw new Error('Server error');
+        } catch (error) {
+            alert('우선순위 변경에 실패했습니다.');
+            project.priority = originalPriority;
+            renderProjects();
+        }
+    }
+    
     async function handleDeadlineChange(e) {
         const newDeadline = e.target.value;
-        await fetch(`/api/project/${currentOpenProjectId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ deadline: newDeadline })
-        });
-        await refreshDataAndRender();
+        const project = appData.projects.find(p => p.id === currentOpenProjectId);
+        if (!project || project.deadline === newDeadline) return;
+
+        const originalDeadline = project.deadline;
+        project.deadline = newDeadline;
+        renderAll();
+
+        try {
+            const response = await fetch(`/api/project/${currentOpenProjectId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ deadline: newDeadline }) });
+            if (!response.ok) throw new Error('Server error');
+        } catch (error) {
+            alert('마감일 변경에 실패했습니다.');
+            project.deadline = originalDeadline;
+            renderAll();
+        }
+    }
+    
+    async function handleTaskContentEdit(taskId, newContent) {
+        const project = appData.projects.find(p => p.tasks.some(t => t.id == taskId));
+        const task = project?.tasks.find(t => t.id == taskId);
+        if (!task || task.content === newContent) return;
+    
+        const originalContent = task.content;
+        task.content = newContent;
+    
+        try {
+            const response = await fetch(`/api/task/${taskId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: newContent }) });
+            if (!response.ok) throw new Error('Server error');
+        } catch (error) {
+            alert("업무 내용 저장에 실패했습니다.");
+            task.content = originalContent;
+            renderDetailsModal();
+        }
+    }
+
+    async function handleTaskDeadlineEdit(taskId, newDeadline) {
+        const project = appData.projects.find(p => p.tasks.some(t => t.id == taskId));
+        const task = project?.tasks.find(t => t.id == taskId);
+        if (!task) return;
+
+        const originalDeadline = task.deadline;
+        task.deadline = newDeadline;
+        renderDetailsModal();
+        initializeProjectCalendar(project);
+        initializeCalendar();
+
+        try {
+            const response = await fetch(`/api/task/${taskId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ deadline: newDeadline }) });
+            if (!response.ok) throw new Error('Server error');
+        } catch(error) {
+            alert('업무 마감일 저장에 실패했습니다.');
+            task.deadline = originalDeadline;
+            renderDetailsModal();
+            initializeProjectCalendar(project);
+            initializeCalendar();
+        }
+    }
+    
+    async function updateProgress(type, id, valueStr) {
+        const value = parseInt(valueStr);
+        const projectIndex = appData.projects.findIndex(p => p.id == (type === 'task' ? appData.projects.find(pr => pr.tasks.some(t => t.id == id))?.id : id));
+        if (projectIndex === -1) return;
+        
+        const project = appData.projects[projectIndex];
+        const originalProjectProgress = project.progress;
+        let originalTaskProgress = null, taskIndex = -1;
+
+        if (type === 'task') {
+            taskIndex = project.tasks.findIndex(t => t.id == id);
+            if(taskIndex === -1) return;
+            const task = project.tasks[taskIndex];
+            originalTaskProgress = task.progress;
+            task.progress = value;
+            const totalProgress = project.tasks.reduce((sum, t) => sum + parseInt(t.progress), 0);
+            project.progress = Math.round(totalProgress / project.tasks.length);
+        } else {
+            project.progress = value;
+        }
+
+        renderProjects();
+        if (detailsModal.open) renderDetailsModal();
+
+        try {
+            if (type === 'task') {
+                const taskResponse = await fetch(`/api/task/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ progress: value }) });
+                if(!taskResponse.ok) throw new Error('Task update failed');
+                if (originalProjectProgress !== project.progress) {
+                    const projectResponse = await fetch(`/api/project/${project.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ progress: project.progress }) });
+                    if(!projectResponse.ok) throw new Error('Project progress update failed');
+                }
+            } else {
+                const projectResponse = await fetch(`/api/project/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ progress: value }) });
+                if(!projectResponse.ok) throw new Error('Project progress update failed');
+            }
+        } catch (error) {
+            console.error("Progress update failed:", error);
+            alert("진행도 업데이트에 실패했습니다. 원래대로 복구합니다.");
+            appData.projects[projectIndex].progress = originalProjectProgress;
+            if (type === 'task') {
+                appData.projects[projectIndex].tasks[taskIndex].progress = originalTaskProgress;
+            }
+            renderProjects();
+            if (detailsModal.open) renderDetailsModal();
+        }
+    }
+
+    async function handleAddNewTaskInDetail() {
+        if (!currentOpenProjectId) return;
+        try {
+            const response = await fetch(`/api/project/${currentOpenProjectId}/task`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+            if (!response.ok) throw new Error('Server error');
+            const newTask = await response.json();
+            const project = appData.projects.find(p => p.id === currentOpenProjectId);
+            project.tasks.push(newTask);
+            renderDetailsModal();
+            const newTaskInput = document.querySelector(`textarea[data-task-id="${newTask.id}"]`);
+            if (newTaskInput) {
+                newTaskInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                newTaskInput.focus();
+            }
+        } catch (error) {
+            alert('업무 추가에 실패했습니다.');
+        }
     }
 
     function handleTitleEdit(e) {
@@ -441,12 +755,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const saveChange = async () => {
             const newName = input.value.trim();
             if (newName && newName !== originalName) {
-                await fetch(`/api/project/${currentOpenProjectId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: newName })
-                });
-                await refreshDataAndRender();
+                await handleGenericUpdate(
+                    () => fetch(`/api/project/${currentOpenProjectId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newName }) }),
+                    (updatedProject) => {
+                        const projectIndex = appData.projects.findIndex(p => p.id === updatedProject.id);
+                        if(projectIndex > -1) appData.projects[projectIndex] = updatedProject;
+                    }
+                );
             } else {
                 renderDetailsModal();
             }
@@ -458,14 +773,15 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function toggleSidebar() {
+    function toggleSidebar() { 
         const isOpen = sidebar.classList.contains('open');
         if (!isOpen && boardToggleBtn.classList.contains('has-notification')) {
             markPostsAsRead();
         }
-        sidebar.classList.toggle('open');
-        sidebarBackdrop.classList.toggle('visible');
+        sidebar.classList.toggle('open'); 
+        sidebarBackdrop.classList.toggle('visible'); 
     }
+    
     async function markPostsAsRead() {
         if (!currentUser) return;
         boardToggleBtn.classList.remove('has-notification');
@@ -476,54 +792,88 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         appData.has_new_posts = false;
     }
-    function openPostModalForNew() { postModal.showModal(); postForm.reset(); postIdInput.value = ''; postModalTitle.textContent = '새 글 작성'; }
-    function handlePostListClick(e) { const postItem = e.target.closest('.post-item'); if (!postItem) return; currentOpenPostId = parseInt(postItem.dataset.postId); const post = appData.posts.find(p => p.id === currentOpenPostId); document.getElementById('post-view-title').textContent = post.title; document.getElementById('post-view-meta').textContent = `작성자: ${post.author_name} | 최종 수정: ${new Date(post.updated_at).toLocaleString()}`; document.getElementById('post-view-body').textContent = post.content; if (currentUser.id === post.user_id) { editPostBtn.style.display = 'inline-block'; deletePostBtn.style.display = 'inline-block'; } else { editPostBtn.style.display = 'none'; deletePostBtn.style.display = 'none'; } postViewModal.showModal(); }
-    async function handlePostFormSubmit(e) { e.preventDefault(); const postId = postIdInput.value; const postData = { title: postTitleInput.value, content: postContentTextarea.value, user_id: currentUser.id }; if (postId) { await fetch(`/api/post/${postId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(postData) }); } else { await fetch('/api/post', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(postData) }); } postModal.close(); await refreshDataAndRender(localStorage.getItem('currentSchedulerUser')); }
-    function handleEditPostBtnClick() { const post = appData.posts.find(p => p.id === currentOpenPostId); if (!post) return; postViewModal.close(); postModal.showModal(); postModalTitle.textContent = '글 수정'; postIdInput.value = post.id; postTitleInput.value = post.title; postContentTextarea.value = post.content; }
-    async function handleDeletePost() { if (confirm('이 글을 정말로 삭제하시겠습니까?')) { await fetch(`/api/post/${currentOpenPostId}`, { method: 'DELETE' }); postViewModal.close(); await refreshDataAndRender(localStorage.getItem('currentSchedulerUser')); } }
-    function handleUserSwitch(userId) { localStorage.setItem('currentSchedulerUser', userId); currentUser = appData.users.find(u => u.id === parseInt(userId)); userPopup.style.display = 'none'; renderCurrentUserIcon(); renderProjects(); }
-    async function handleUserAdd() { const name = newUserNameInput.value.trim(); if (!name) return; await fetch('/api/user', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name }) }); newUserNameInput.value = ''; await refreshDataAndRender(localStorage.getItem('currentSchedulerUser')); renderUserPopup(); }
-    async function handleUserDelete(userId) { await fetch(`/api/user/${userId}`, { method: 'DELETE' }); await refreshDataAndRender(localStorage.getItem('currentSchedulerUser')); }
-    async function handleAddComment() { const text = commentInput.value.trim(); if (!text || !currentOpenProjectId) return; const newComment = { author_name: currentUser.name, content: text }; await fetch(`/api/project/${currentOpenProjectId}/comment`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newComment) }); commentInput.value = ''; await refreshDataAndRender(); }
-    async function handleTaskContentEdit(taskId, newContent) { await fetch(`/api/task/${taskId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: newContent }) }); await refreshDataAndRender(); }
-    async function handleTaskDeadlineEdit(taskId, newDeadline) { await fetch(`/api/task/${taskId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ deadline: newDeadline }) }); await refreshDataAndRender(); }
-    async function handleTaskDelete(taskId) { await fetch(`/api/task/${taskId}`, { method: 'DELETE' }); await refreshDataAndRender(); }
-    async function handleCommentEdit(commentId, newContent) { await fetch(`/api/comment/${commentId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: newContent }) }); await refreshDataAndRender(); }
-    async function handleCommentDelete(commentId) { await fetch(`/api/comment/${commentId}`, { method: 'DELETE' }); await refreshDataAndRender(); }
-    async function handleCompleteProject() { if (confirm('이 프로젝트를 종료 처리하시겠습니까?')) { await fetch(`/api/project/${currentOpenProjectId}/status`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'completed' }) }); detailsModal.close(); await refreshDataAndRender(); } }
-    async function handleRestoreProject() { if (confirm('이 프로젝트를 다시 활성화하시겠습니까?')) { await fetch(`/api/project/${currentOpenProjectId}/status`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'active' }) }); detailsModal.close(); await refreshDataAndRender(); } }
-    function enterDeleteConfirmationMode() { const rightButtons = document.querySelector('.footer-buttons-right'); rightButtons.style.display = 'none'; deleteProjectBtn.style.display = 'none'; confirmDeleteBtn.style.display = 'block'; confirmDeleteBtn.style.marginLeft = 'auto'; }
-    async function handleConfirmProjectDelete() { const project = appData.projects.find(p => p.id === currentOpenProjectId); if (!project) return; await fetch(`/api/project/${project.id}`, { method: 'DELETE' }); alert('프로젝트가 성공적으로 삭제되었습니다.'); detailsModal.close(); await refreshDataAndRender(); }
-    async function handleAddNewTaskInDetail() { if (!currentOpenProjectId) return; const response = await fetch(`/api/project/${currentOpenProjectId}/task`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: '' }) }); const data = await response.json(); const newTaskId = data.id; await refreshDataAndRender(); const newTaskInput = document.querySelector(`textarea[data-task-id="${newTaskId}"]`); if (newTaskInput) { newTaskInput.scrollIntoView({ behavior: 'smooth', block: 'center' }); newTaskInput.focus(); } }
 
-    async function updateProgress(type, id, value) {
-        if (type === 'task') {
-            await fetch(`/api/task/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ progress: value }) });
-            const project = appData.projects.find(p => p.tasks.some(t => t.id == id));
-            if (project && project.tasks.length > 0) {
-                const task = project.tasks.find(t => t.id == id);
-                if (task) task.progress = parseInt(value);
-                const totalProgress = project.tasks.reduce((sum, t) => sum + parseInt(t.progress), 0);
-                const newProjectProgress = Math.round(totalProgress / project.tasks.length);
-                if (project.progress !== newProjectProgress) {
-                    await fetch(`/api/project/${project.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ progress: newProjectProgress }) });
-                }
+    function openPostModalForNew() { postModal.showModal(); postForm.reset(); postIdInput.value = ''; postModalTitle.textContent = '새 글 작성'; }
+    
+    function handlePostListClick(e) { 
+        const postItem = e.target.closest('.post-item'); 
+        if (!postItem) return; 
+        currentOpenPostId = parseInt(postItem.dataset.postId); 
+        const post = appData.posts.find(p => p.id === currentOpenPostId); 
+        document.getElementById('post-view-title').textContent = post.title; 
+        document.getElementById('post-view-meta').textContent = `작성자: ${post.author_name} | 최종 수정: ${new Date(post.updated_at).toLocaleString()}`; 
+        document.getElementById('post-view-body').textContent = post.content; 
+        if (currentUser.id === post.user_id) { 
+            editPostBtn.style.display = 'inline-block'; 
+            deletePostBtn.style.display = 'inline-block'; 
+        } else { 
+            editPostBtn.style.display = 'none'; 
+            deletePostBtn.style.display = 'none'; 
+        } 
+        postViewModal.showModal(); 
+    }
+
+    async function handlePostFormSubmit(e) { 
+        e.preventDefault(); 
+        const postId = postIdInput.value; 
+        const postData = { title: postTitleInput.value, content: postContentTextarea.value, user_id: currentUser.id }; 
+        try {
+            const url = postId ? `/api/post/${postId}` : '/api/post';
+            const method = postId ? 'PUT' : 'POST';
+            const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(postData) });
+            if (!response.ok) throw new Error('Server error');
+            const resultPost = await response.json();
+            if(postId) {
+                const index = appData.posts.findIndex(p => p.id == postId);
+                if(index > -1) appData.posts[index] = resultPost;
+            } else {
+                appData.posts.unshift(resultPost);
             }
-        } else {
-            await fetch(`/api/${type}/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ progress: value }) });
+            renderSidebar();
+            postModal.close();
+        } catch(error) {
+            alert('게시글 저장에 실패했습니다.');
         }
-        await refreshDataAndRender();
+    }
+
+    function handleEditPostBtnClick() { 
+        const post = appData.posts.find(p => p.id === currentOpenPostId); 
+        if (!post) return; 
+        postViewModal.close(); 
+        postModal.showModal(); 
+        postModalTitle.textContent = '글 수정'; 
+        postIdInput.value = post.id; 
+        postTitleInput.value = post.title; 
+        postContentTextarea.value = post.content; 
+    }
+
+    async function handleDeletePost() { 
+        if (confirm('이 글을 정말로 삭제하시겠습니까?')) { 
+            const originalPosts = [...appData.posts];
+            appData.posts = appData.posts.filter(p => p.id !== currentOpenPostId);
+            renderSidebar();
+            postViewModal.close();
+
+            try {
+                const response = await fetch(`/api/post/${currentOpenPostId}`, { method: 'DELETE' });
+                if (!response.ok) throw new Error('Server error');
+            } catch (error) {
+                alert('게시글 삭제에 실패했습니다.');
+                appData.posts = originalPosts;
+                renderSidebar();
+            }
+        } 
     }
 
     function openProjectModal() {
-        projectForm.reset();
-        document.getElementById('project-start-date').valueAsDate = new Date();
-        const userSelect = document.getElementById('project-user-select');
-        userSelect.innerHTML = appData.users.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
-        if (currentUser) userSelect.value = currentUser.id;
-        modalTaskListEl.innerHTML = '';
-        addModalTaskField();
-        projectModal.showModal();
+         projectForm.reset();
+         document.getElementById('project-start-date').valueAsDate = new Date();
+         const userSelect = document.getElementById('project-user-select');
+         userSelect.innerHTML = appData.users.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
+         if (currentUser) userSelect.value = currentUser.id;
+         modalTaskListEl.innerHTML = '';
+         addModalTaskField();
+         projectModal.showModal();
     }
 
     function addModalTaskField() {
@@ -540,39 +890,14 @@ document.addEventListener('DOMContentLoaded', () => {
         textarea.addEventListener('input', autoResizeTextarea);
         modalTaskListEl.appendChild(taskField);
     }
-
-    async function handleFormSubmit(e) {
-        e.preventDefault();
-        const tasks = [];
-        document.querySelectorAll('#modal-task-list > div').forEach(field => {
-            const content = field.querySelector('.task-content-input').value.trim();
-            if (content) {
-                tasks.push({
-                    content: content,
-                    deadline: field.querySelector('.modal-task-deadline').value || null
-                });
-            }
-        });
-        const newProject = { name: document.getElementById('project-name-input').value, user_id: parseInt(document.getElementById('project-user-select').value), priority: parseInt(document.getElementById('project-priority-select').value), start_date: document.getElementById('project-start-date').value, deadline: document.getElementById('project-deadline').value, tasks: tasks };
-        await fetch('/api/project', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newProject) });
-        projectModal.close();
-        await refreshDataAndRender();
-    }
-
     // --- 6. 헬퍼 함수 ---
     function autoResizeTextarea(event) { const textarea = event.target; textarea.style.height = 'auto'; textarea.style.height = textarea.scrollHeight + 'px'; }
     function getShortName(name) { if (name === 'DI 팀') { return 'DI'; } if (name && name.length > 1) { return name.substring(1).trim().replace(/\s/g, ''); } return name; }
     function getUserColor(userId) { const colors = ['#6d6875', '#b5838d', '#e5989b', '#ffb4a2', '#ffcdb2']; return colors[((userId || 0) - 1 + colors.length) % colors.length]; }
-    function getProjectColor(projectId) { const colors = [{ main: '#20c997', background: '#e9fbf5' }, { main: '#fd7e14', background: '#fff4e7' }, { main: '#6610f2', background: '#f0e7fd' }, { main: '#0d6efd', background: '#e7f0ff' }, { main: '#d63384', background: '#faeaf1' }, { main: '#198754', background: '#e8f3ee' }]; return colors[((projectId || 0) - 1 + colors.length) % colors.length]; }
+    function getProjectColor(projectId) { const colors = [ { main: '#20c997', background: '#e9fbf5' }, { main: '#fd7e14', background: '#fff4e7' }, { main: '#6610f2', background: '#f0e7fd' }, { main: '#0d6efd', background: '#e7f0ff' }, { main: '#d63384', background: '#faeaf1' }, { main: '#198754', background: '#e8f3ee' } ]; return colors[((projectId || 0) - 1 + colors.length) % colors.length]; }
     function calculateDday(deadline) { if (!deadline) return { text: '', isUrgent: false }; const today = new Date(); const deadlineDate = new Date(deadline); today.setHours(0, 0, 0, 0); deadlineDate.setHours(0, 0, 0, 0); const diffTime = deadlineDate - today; const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); if (diffDays === 0) { return { text: 'D-Day', isUrgent: true }; } else if (diffDays < 0) { return { text: `D+${Math.abs(diffDays)}`, isUrgent: false }; } else { return { text: `D-${diffDays}`, isUrgent: diffDays <= 7 }; } }
-    function formatDateToYYYYMMDD(dateString) {
-        if (!dateString) return '';
-        const date = new Date(dateString);
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    }
+    function formatDateToYYYYMMDD(dateString) { if (!dateString) return ''; const date = new Date(dateString); const year = date.getFullYear(); const month = String(date.getMonth() + 1).padStart(2, '0'); const day = String(date.getDate()).padStart(2, '0'); return `${year}-${month}-${day}`; }
+    
     // --- 앱 시작 ---
     initializeApp();
 });
