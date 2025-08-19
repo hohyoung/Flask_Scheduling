@@ -118,18 +118,21 @@
             <div class="details-modal-left">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h3 id="details-modal-title" style="margin: 0;"></h3>
-                    <select id="details-priority-select">
-                        <option value="1">우선순위: 높음</option>
-                        <option value="2">우선순위: 보통</option>
-                        <option value="3">우선순위: 낮음</option>
-                    </select>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <input type="date" id="details-deadline-input">
+                        <select id="details-priority-select">
+                            <option value="1">우선순위: 높음</option>
+                            <option value="2">우선순위: 보통</option>
+                            <option value="3">우선순위: 낮음</option>
+                        </select>
+                    </div>
                 </div>
                 <h4>
-                     <span>세부 업무</span>
-                     <button id="add-detail-task-btn">
-                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M11 11V5h2v6h6v2h-6v6h-2v-6H5v-2h6z"></path></svg>
-                             <span>업무 추가</span>
-                     </button>
+                    <span>세부 업무</span>
+                    <button id="add-detail-task-btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M11 11V5h2v6h6v2h-6v6h-2v-6H5v-2h6z"></path></svg>
+                        <span>업무 추가</span>
+                    </button>
                 </h4>
                 <div id="details-task-list" class="task-list-popup"></div>
                 <div class="comments-section">

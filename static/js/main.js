@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const detailsModal = document.getElementById('details-modal');
     const detailsModalTitle = document.getElementById('details-modal-title');
     const detailsPrioritySelect = document.getElementById('details-priority-select');
+    const detailsDeadlineInput = document.getElementById('details-deadline-input');
     const detailsTaskList = document.getElementById('details-task-list');
     const projectCalendarEl = document.getElementById('project-calendar');
     const commentsList = document.getElementById('comments-list');
@@ -58,10 +59,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- 2. 초기화 및 데이터 갱신 ---
     async function initializeApp() {
         const savedUserId = localStorage.getItem('currentSchedulerUser');
-        setupEventListeners(); 
+        setupEventListeners();
         await refreshDataAndRender(savedUserId);
     }
-    
+
     async function refreshDataAndRender(savedUserId = null) {
         try {
             const headers = {};
@@ -69,8 +70,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers['X-Current-User-ID'] = currentUser.id;
             }
             const response = await fetch('/api/data', { headers });
+            if (!response.ok) {
+                throw new Error(`API 요청 실패: ${response.status}`);
+            }
             appData = await response.json();
-            
+
             if (savedUserId && appData.users.some(u => u.id == savedUserId)) {
                 currentUser = appData.users.find(u => u.id == savedUserId);
             } else if ((!currentUser || !appData.users.some(u => u.id === currentUser.id)) && appData.users.length > 0) {
@@ -81,7 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderProjects();
             initializeCalendar();
             renderSidebar();
-            
+
             if (appData.has_new_posts) {
                 boardToggleBtn.classList.add('has-notification');
             } else {
@@ -127,13 +131,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentUser && project.user_id === currentUser.id) {
             projectEl.classList.add('is-mine');
         }
-        
+
         const projectColors = getProjectColor(project.id);
         projectEl.style.backgroundColor = 'var(--color-surface)';
         projectEl.style.borderLeftColor = projectColors.main;
-        
+
         const dDayData = calculateDday(project.deadline);
-        
+
         let progressDisplayHTML = '';
         if (project.tasks.length > 0) {
             progressDisplayHTML = `
@@ -188,11 +192,11 @@ document.addEventListener('DOMContentLoaded', () => {
             completedProjectsSection.style.display = 'none';
         }
     }
-    
+
     function renderDetailsModal() {
         const project = appData.projects.find(p => p.id === currentOpenProjectId);
         if (!project) {
-            detailsModal.close(); 
+            detailsModal.close();
             return;
         };
 
@@ -200,7 +204,7 @@ document.addEventListener('DOMContentLoaded', () => {
         rightButtons.style.display = 'flex';
         confirmDeleteBtn.style.display = 'none';
         deleteProjectBtn.style.display = 'block';
-        
+
         if (project.status === 'completed') {
             completeProjectBtn.style.display = 'none';
             restoreProjectBtn.style.display = 'block';
@@ -211,12 +215,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         detailsModalTitle.textContent = project.name;
         detailsPrioritySelect.value = project.priority;
+        detailsDeadlineInput.value = formatDateToYYYYMMDD(project.deadline);
 
         detailsTaskList.innerHTML = '';
         project.tasks.forEach(task => {
             const taskEl = document.createElement('div');
             taskEl.className = 'task-item-popup';
-            const deadlineValue = task.deadline ? `value="${task.deadline}"` : '';
+            const deadlineValue = task.deadline ? `value="${formatDateToYYYYMMDD(task.deadline)}"` : '';
             taskEl.innerHTML = `
                 <div class="task-item-header">
                     <textarea class="task-content-input" data-task-id="${task.id}" rows="1">${task.content}</textarea>
@@ -235,7 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
             textarea.addEventListener('input', autoResizeTextarea);
             autoResizeTextarea({ target: textarea });
         });
-        
+
         commentsList.innerHTML = '';
         project.comments.forEach(comment => {
             const commentEl = document.createElement('div');
@@ -282,16 +287,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const projectColors = getProjectColor(project.id);
             const assignee = appData.users.find(u => u.id === project.user_id);
             const assigneeName = assignee ? ` ${assignee.name}` : '';
-            events.push({ 
-                title: `[P${assigneeName}] ${project.name}`, 
-                start: project.start_date, 
-                end: project.deadline, 
-                backgroundColor: projectColors.main, 
-                borderColor: projectColors.main 
+            events.push({
+                title: `[P${assigneeName}] ${project.name}`,
+                start: formatDateToYYYYMMDD(project.start_date),
+                end: formatDateToYYYYMMDD(project.deadline),
+                backgroundColor: projectColors.main,
+                borderColor: projectColors.main
             });
-            project.tasks.forEach(task => { 
-                if(task.deadline) { 
-                    events.push({ title: `[업무] ${task.content}`, start: task.deadline, allDay: true, backgroundColor: '#6c757d' });
+            project.tasks.forEach(task => {
+                if (task.deadline) {
+                    events.push({ title: `[업무] ${task.content}`, start: formatDateToYYYYMMDD(task.deadline), allDay: true, backgroundColor: '#6c757d' });
                 }
             });
         });
@@ -307,9 +312,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function initializeProjectCalendar(project) {
         const events = [];
-        project.tasks.forEach(task => { 
-            if(task.deadline) { 
-                events.push({ title: task.content, start: task.deadline, allDay: true, backgroundColor: getProjectColor(project.id).main });
+        project.tasks.forEach(task => {
+            if (task.deadline) {
+                events.push({ title: task.content, start: formatDateToYYYYMMDD(task.deadline), allDay: true, backgroundColor: getProjectColor(project.id).main });
             }
         });
         if (projectCalendar) projectCalendar.destroy();
@@ -334,7 +339,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // 프로젝트 리스트 클릭
         projectListEl.addEventListener('click', openDetailsModal);
         completedProjectListEl.addEventListener('click', openDetailsModal);
-        
+
         // 상세 모달 이벤트
         closeDetailsModalBtn.addEventListener('click', () => detailsModal.close());
         completeProjectBtn.addEventListener('click', handleCompleteProject);
@@ -342,6 +347,7 @@ document.addEventListener('DOMContentLoaded', () => {
         deleteProjectBtn.addEventListener('click', enterDeleteConfirmationMode);
         confirmDeleteBtn.addEventListener('click', handleConfirmProjectDelete);
         detailsPrioritySelect.addEventListener('change', handlePriorityChange);
+        detailsDeadlineInput.addEventListener('change', handleDeadlineChange);
         detailsTaskList.addEventListener('change', (e) => { if (e.target.type === 'range') updateProgress('task', e.target.dataset.taskId, e.target.value); if (e.target.classList.contains('deadline-input')) handleTaskDeadlineEdit(e.target.dataset.taskId, e.target.value); });
         detailsTaskList.addEventListener('focusout', (e) => { if (e.target.classList.contains('task-content-input')) handleTaskContentEdit(e.target.dataset.taskId, e.target.value); });
         detailsTaskList.addEventListener('click', (e) => { if (e.target.classList.contains('delete-task-btn')) { if (confirm('이 업무를 삭제하시겠습니까?')) handleTaskDelete(e.target.dataset.taskId); } });
@@ -349,7 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
         commentsList.addEventListener('click', (e) => { if (e.target.classList.contains('delete-comment-btn')) { const commentItem = e.target.closest('.comment-item'); if (confirm('이 코멘트를 삭제하시겠습니까?')) handleCommentDelete(commentItem.dataset.commentId); } if (e.target.classList.contains('edit-comment-btn')) { const commentItem = e.target.closest('.comment-item'); const currentContent = commentItem.querySelector('.comment-text-content span:last-child').textContent; const newContent = prompt('코멘트를 수정하세요:', currentContent); if (newContent && newContent.trim() !== currentContent) { handleCommentEdit(commentItem.dataset.commentId, newContent.trim()); } } });
         detailsModalTitle.addEventListener('click', handleTitleEdit);
         addDetailTaskBtn.addEventListener('click', handleAddNewTaskInDetail);
-        
+
         // 수동 진행도 슬라이더 이벤트
         projectListEl.addEventListener('change', (e) => { if (e.target.classList.contains('manual-progress-slider')) { updateProgress('project', e.target.dataset.projectId, e.target.value); } });
 
@@ -377,7 +383,7 @@ document.addEventListener('DOMContentLoaded', () => {
             modal.addEventListener('click', (e) => { if (e.target === modal) modal.close(); });
         });
     }
-    
+
     // --- 5. 이벤트 핸들러 & 로직 ---
     function openDetailsModal(e) {
         if (e.target.classList.contains('manual-progress-slider')) {
@@ -396,7 +402,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 0);
         }
     }
-    
+
     async function handlePriorityChange(e) {
         const newPriority = e.target.value;
         await fetch(`/api/project/${currentOpenProjectId}`, {
@@ -406,7 +412,17 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         await refreshDataAndRender();
     }
-    
+
+    async function handleDeadlineChange(e) {
+        const newDeadline = e.target.value;
+        await fetch(`/api/project/${currentOpenProjectId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ deadline: newDeadline })
+        });
+        await refreshDataAndRender();
+    }
+
     function handleTitleEdit(e) {
         const titleElement = e.target;
         const project = appData.projects.find(p => p.id === currentOpenProjectId);
@@ -415,6 +431,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const input = document.createElement('input');
         input.type = 'text';
         input.value = originalName;
+        input.className = 'title-edit-input';
         input.style.fontSize = '24px';
         input.style.fontWeight = 'bold';
         input.style.border = '1px solid #007bff';
@@ -441,13 +458,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function toggleSidebar() { 
+    function toggleSidebar() {
         const isOpen = sidebar.classList.contains('open');
         if (!isOpen && boardToggleBtn.classList.contains('has-notification')) {
             markPostsAsRead();
         }
-        sidebar.classList.toggle('open'); 
-        sidebarBackdrop.classList.toggle('visible'); 
+        sidebar.classList.toggle('open');
+        sidebarBackdrop.classList.toggle('visible');
     }
     async function markPostsAsRead() {
         if (!currentUser) return;
@@ -465,9 +482,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleEditPostBtnClick() { const post = appData.posts.find(p => p.id === currentOpenPostId); if (!post) return; postViewModal.close(); postModal.showModal(); postModalTitle.textContent = '글 수정'; postIdInput.value = post.id; postTitleInput.value = post.title; postContentTextarea.value = post.content; }
     async function handleDeletePost() { if (confirm('이 글을 정말로 삭제하시겠습니까?')) { await fetch(`/api/post/${currentOpenPostId}`, { method: 'DELETE' }); postViewModal.close(); await refreshDataAndRender(localStorage.getItem('currentSchedulerUser')); } }
     function handleUserSwitch(userId) { localStorage.setItem('currentSchedulerUser', userId); currentUser = appData.users.find(u => u.id === parseInt(userId)); userPopup.style.display = 'none'; renderCurrentUserIcon(); renderProjects(); }
-    async function handleUserAdd() { await fetch('/api/user', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newUserNameInput.value.trim() }) }); newUserNameInput.value = ''; await refreshDataAndRender(localStorage.getItem('currentSchedulerUser')); renderUserPopup(); }
+    async function handleUserAdd() { const name = newUserNameInput.value.trim(); if (!name) return; await fetch('/api/user', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name }) }); newUserNameInput.value = ''; await refreshDataAndRender(localStorage.getItem('currentSchedulerUser')); renderUserPopup(); }
     async function handleUserDelete(userId) { await fetch(`/api/user/${userId}`, { method: 'DELETE' }); await refreshDataAndRender(localStorage.getItem('currentSchedulerUser')); }
-    async function handleAddComment() { const text = commentInput.value.trim(); if (!text || !currentOpenProjectId) return; const newComment = { author: currentUser.name, text: text }; await fetch(`/api/project/${currentOpenProjectId}/comment`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newComment) }); commentInput.value = ''; await refreshDataAndRender(); }
+    async function handleAddComment() { const text = commentInput.value.trim(); if (!text || !currentOpenProjectId) return; const newComment = { author_name: currentUser.name, content: text }; await fetch(`/api/project/${currentOpenProjectId}/comment`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newComment) }); commentInput.value = ''; await refreshDataAndRender(); }
     async function handleTaskContentEdit(taskId, newContent) { await fetch(`/api/task/${taskId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: newContent }) }); await refreshDataAndRender(); }
     async function handleTaskDeadlineEdit(taskId, newDeadline) { await fetch(`/api/task/${taskId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ deadline: newDeadline }) }); await refreshDataAndRender(); }
     async function handleTaskDelete(taskId) { await fetch(`/api/task/${taskId}`, { method: 'DELETE' }); await refreshDataAndRender(); }
@@ -477,30 +494,8 @@ document.addEventListener('DOMContentLoaded', () => {
     async function handleRestoreProject() { if (confirm('이 프로젝트를 다시 활성화하시겠습니까?')) { await fetch(`/api/project/${currentOpenProjectId}/status`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'active' }) }); detailsModal.close(); await refreshDataAndRender(); } }
     function enterDeleteConfirmationMode() { const rightButtons = document.querySelector('.footer-buttons-right'); rightButtons.style.display = 'none'; deleteProjectBtn.style.display = 'none'; confirmDeleteBtn.style.display = 'block'; confirmDeleteBtn.style.marginLeft = 'auto'; }
     async function handleConfirmProjectDelete() { const project = appData.projects.find(p => p.id === currentOpenProjectId); if (!project) return; await fetch(`/api/project/${project.id}`, { method: 'DELETE' }); alert('프로젝트가 성공적으로 삭제되었습니다.'); detailsModal.close(); await refreshDataAndRender(); }
-    
-    
-    
-    async function handleAddNewTaskInDetail() {
-        if (!currentOpenProjectId) return;
-    
-             const response = await fetch(`/api/project/${currentOpenProjectId}/task`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content: '' })
-        });
-        const data = await response.json();
-        const newTaskId = data.task_id; // 새로 생성된 업무의 ID를 받아옴
+    async function handleAddNewTaskInDetail() { if (!currentOpenProjectId) return; const response = await fetch(`/api/project/${currentOpenProjectId}/task`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: '' }) }); const data = await response.json(); const newTaskId = data.id; await refreshDataAndRender(); const newTaskInput = document.querySelector(`textarea[data-task-id="${newTaskId}"]`); if (newTaskInput) { newTaskInput.scrollIntoView({ behavior: 'smooth', block: 'center' }); newTaskInput.focus(); } }
 
-        await refreshDataAndRender();
-
-        // [핵심 수정] 화면이 갱신된 후, 새로 생긴 입력창을 찾아 스크롤하고 포커스
-        const newTaskInput = document.querySelector(`textarea[data-task-id="${newTaskId}"]`);
-        if (newTaskInput) {
-            newTaskInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            newTaskInput.focus();
-        }
-    }
-    
     async function updateProgress(type, id, value) {
         if (type === 'task') {
             await fetch(`/api/task/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ progress: value }) });
@@ -521,14 +516,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function openProjectModal() {
-         projectForm.reset();
-         document.getElementById('project-start-date').valueAsDate = new Date();
-         const userSelect = document.getElementById('project-user-select');
-         userSelect.innerHTML = appData.users.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
-         if (currentUser) userSelect.value = currentUser.id;
-         modalTaskListEl.innerHTML = '';
-         addModalTaskField();
-         projectModal.showModal();
+        projectForm.reset();
+        document.getElementById('project-start-date').valueAsDate = new Date();
+        const userSelect = document.getElementById('project-user-select');
+        userSelect.innerHTML = appData.users.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
+        if (currentUser) userSelect.value = currentUser.id;
+        modalTaskListEl.innerHTML = '';
+        addModalTaskField();
+        projectModal.showModal();
     }
 
     function addModalTaskField() {
@@ -547,31 +542,37 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function handleFormSubmit(e) {
-         e.preventDefault();
-         const tasks = [];
-         document.querySelectorAll('#modal-task-list > div').forEach(field => {
-             const content = field.querySelector('.task-content-input').value.trim();
-             if (content) {
-                 tasks.push({
-                     content: content,
-                     deadline: field.querySelector('.modal-task-deadline').value || null
-                 });
-             }
-         });
-         const newProject = { name: document.getElementById('project-name-input').value, user_id: parseInt(document.getElementById('project-user-select').value), priority: parseInt(document.getElementById('project-priority-select').value), start_date: document.getElementById('project-start-date').value, deadline: document.getElementById('project-deadline').value, tasks: tasks };
-         await fetch('/api/project', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newProject) });
-         projectModal.close();
-         await refreshDataAndRender();
+        e.preventDefault();
+        const tasks = [];
+        document.querySelectorAll('#modal-task-list > div').forEach(field => {
+            const content = field.querySelector('.task-content-input').value.trim();
+            if (content) {
+                tasks.push({
+                    content: content,
+                    deadline: field.querySelector('.modal-task-deadline').value || null
+                });
+            }
+        });
+        const newProject = { name: document.getElementById('project-name-input').value, user_id: parseInt(document.getElementById('project-user-select').value), priority: parseInt(document.getElementById('project-priority-select').value), start_date: document.getElementById('project-start-date').value, deadline: document.getElementById('project-deadline').value, tasks: tasks };
+        await fetch('/api/project', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newProject) });
+        projectModal.close();
+        await refreshDataAndRender();
     }
-    
+
     // --- 6. 헬퍼 함수 ---
     function autoResizeTextarea(event) { const textarea = event.target; textarea.style.height = 'auto'; textarea.style.height = textarea.scrollHeight + 'px'; }
     function getShortName(name) { if (name === 'DI 팀') { return 'DI'; } if (name && name.length > 1) { return name.substring(1).trim().replace(/\s/g, ''); } return name; }
     function getUserColor(userId) { const colors = ['#6d6875', '#b5838d', '#e5989b', '#ffb4a2', '#ffcdb2']; return colors[((userId || 0) - 1 + colors.length) % colors.length]; }
-    function getProjectColor(projectId) { const colors = [ { main: '#20c997', background: '#e9fbf5' }, { main: '#fd7e14', background: '#fff4e7' }, { main: '#6610f2', background: '#f0e7fd' }, { main: '#0d6efd', background: '#e7f0ff' }, { main: '#d63384', background: '#faeaf1' }, { main: '#198754', background: '#e8f3ee' } ]; return colors[((projectId || 0) - 1 + colors.length) % colors.length]; }
+    function getProjectColor(projectId) { const colors = [{ main: '#20c997', background: '#e9fbf5' }, { main: '#fd7e14', background: '#fff4e7' }, { main: '#6610f2', background: '#f0e7fd' }, { main: '#0d6efd', background: '#e7f0ff' }, { main: '#d63384', background: '#faeaf1' }, { main: '#198754', background: '#e8f3ee' }]; return colors[((projectId || 0) - 1 + colors.length) % colors.length]; }
     function calculateDday(deadline) { if (!deadline) return { text: '', isUrgent: false }; const today = new Date(); const deadlineDate = new Date(deadline); today.setHours(0, 0, 0, 0); deadlineDate.setHours(0, 0, 0, 0); const diffTime = deadlineDate - today; const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); if (diffDays === 0) { return { text: 'D-Day', isUrgent: true }; } else if (diffDays < 0) { return { text: `D+${Math.abs(diffDays)}`, isUrgent: false }; } else { return { text: `D-${diffDays}`, isUrgent: diffDays <= 7 }; } }
-    
+    function formatDateToYYYYMMDD(dateString) {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
     // --- 앱 시작 ---
     initializeApp();
-    });
-    
+});
