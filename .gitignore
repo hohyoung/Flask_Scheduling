@@ -14,3 +14,5 @@ __pycache__/
 # 운영체제별 시스템 파일
 .DS_Store
 Thumbs.db
+
+.env
