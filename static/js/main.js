@@ -1134,6 +1134,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentUser) userSelect.value = currentUser.id;
         modalTaskListEl.innerHTML = '';
         addModalTaskField();
+        document.getElementById('project-deadline').required = false;
         projectModal.showModal();
     }
 
