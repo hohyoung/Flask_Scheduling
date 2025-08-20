@@ -37,12 +37,25 @@
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20px" height="20px"><path d="M11 11V5h2v6h6v2h-6v6h-2v-6H5v-2h6z"></path></svg>
                 <span>새 프로젝트</span>
             </button>
+            <div id="category-filters" class="category-filters">
+                <button class="filter-btn active" data-category="전체">전체</button>
+                <button class="filter-btn" data-category="문서">문서</button>
+                <button class="filter-btn" data-category="개발">개발</button>
+                <button class="filter-btn" data-category="기타">기타</button>
+            </div>
         </section>
 
         <div class="main-content">
             <div id="project-list-wrapper">
-                <main id="project-list" class="project-list"></main>
-                <section id="completed-projects-section" style="display: none;">
+                <section id="active-projects-section" class="project-section">
+                    <h2>진행중인 프로젝트</h2>
+                    <main id="project-list" class="project-list"></main>
+                </section>
+                <section id="scheduled-projects-section" class="project-section">
+                    <h2>프로젝트 예정</h2>
+                    <div id="scheduled-project-list" class="project-list"></div>
+                </section>
+                <section id="completed-projects-section" class="project-section">
                     <h2>종료된 프로젝트</h2>
                     <div id="completed-project-list" class="project-list"></div>
                 </section>
@@ -96,14 +109,27 @@
              <h3>새 프로젝트 생성</h3>
              <input type="text" id="project-name-input" placeholder="프로젝트 이름" required>
              <select id="project-user-select" required></select>
-             <select id="project-priority-select" required>
-                 <option value="" disabled selected>우선순위 선택</option>
-                 <option value="1">높음</option>
-                 <option value="2">보통</option>
-                 <option value="3">낮음</option>
-             </select>
-             <input type="date" id="project-start-date" required title="시작일">
-             <input type="date" id="project-deadline" required title="마감일">
+             <div class="form-row">
+                <select id="project-category-select">
+                    <option value="문서">문서</option>
+                    <option value="개발">개발</option>
+                    <option value="기타" selected>기타</option>
+                </select>
+                <select id="project-priority-select" required>
+                    <option value="" disabled selected>우선순위</option>
+                    <option value="1">높음</option>
+                    <option value="2">보통</option>
+                    <option value="3">낮음</option>
+                </select>
+             </div>
+             <div class="status-radios">
+                <label><input type="radio" name="status" value="scheduled" checked> 예정</label>
+                <label><input type="radio" name="status" value="active"> 진행</label>
+             </div>
+             <div class="form-row">
+                <input type="date" id="project-start-date" required title="시작일">
+                <input type="date" id="project-deadline" title="마감일">
+             </div>
              <div id="modal-task-list"></div>
              <button type="button" id="add-task-field-btn">세부 업무 추가</button>
              <div class="form-buttons">
@@ -116,9 +142,14 @@
     <dialog id="details-modal">
         <div class="details-modal-content">
             <div class="details-modal-left">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <h3 id="details-modal-title" style="margin: 0;"></h3>
-                    <div style="display: flex; align-items: center; gap: 10px;">
+                <div class="details-header">
+                    <h3 id="details-modal-title"></h3>
+                    <div class="details-controls">
+                        <select id="details-category-select">
+                            <option value="문서">문서</option>
+                            <option value="개발">개발</option>
+                            <option value="기타">기타</option>
+                        </select>
                         <input type="date" id="details-deadline-input">
                         <select id="details-priority-select">
                             <option value="1">우선순위: 높음</option>
@@ -151,9 +182,13 @@
         <div id="details-modal-footer">
             <button type="button" id="close-details-modal-btn">닫기</button>
             <div class="footer-buttons-right">
+                <div id="status-change-buttons">
+                    <button type="button" id="set-status-active-btn">진행으로 변경</button>
+                    <button type="button" id="set-status-scheduled-btn">예정으로 변경</button>
+                    <button type="button" id="complete-project-btn">프로젝트 종료</button>
+                    <button type="button" id="restore-project-btn">프로젝트 복구</button>
+                </div>
                 <button type="button" id="delete-project-btn">프로젝트 삭제</button>
-                <button type="button" id="restore-project-btn">프로젝트 되살리기</button>
-                <button type="button" id="complete-project-btn">프로젝트 종료</button>
             </div>
             <button type="button" id="confirm-delete-btn" style="display: none;">삭제 최종 확인</button>
         </div>

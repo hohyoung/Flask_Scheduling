@@ -25,13 +25,14 @@ def create_database():
         CREATE TABLE Projects (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
-            user_id INTEGER,
-            start_date TEXT NOT NULL,
-            deadline TEXT NOT NULL,
+            user_id INTEGER REFERENCES Users(id) ON DELETE SET NULL,
+            start_date DATE NOT NULL,
+            deadline DATE, -- [수정] NOT NULL 제거
             priority INTEGER DEFAULT 2,
             progress INTEGER DEFAULT 0,
-            status TEXT NOT NULL DEFAULT 'active',
-            FOREIGN KEY (user_id) REFERENCES Users (id)
+            status TEXT NOT NULL DEFAULT 'scheduled', -- [수정] 기본값을 'scheduled'로 변경
+            category TEXT NOT NULL DEFAULT '기타', -- [신규] 카테고리 컬럼 추가
+            FOREIGN KEY (user_id) REFERENCES Users(id)
         );
 
         CREATE TABLE Tasks (
