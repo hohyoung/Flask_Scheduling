@@ -470,5 +470,5 @@ def mark_posts_as_read():
     finally:
         conn.close()
 
-if __name__ == '__main__':
-    app.run(debug=True)
+# if __name__ == '__main__':
+#     app.run(debug=True)
