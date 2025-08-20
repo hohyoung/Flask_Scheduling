@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentOpenProjectId = null;
     let currentOpenPostId = null;
     let currentCategoryFilter = '전체';
+    let sortable_tasks = null;
 
     const projectListEl = document.getElementById('project-list');
     const completedProjectListEl = document.getElementById('completed-project-list');
@@ -64,6 +65,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const deletePostBtn = document.getElementById('delete-post-btn');
     const categoryFiltersEl = document.getElementById('category-filters');
     const detailsModalTitleInput = document.getElementById('title-edit-input');
+    const detailsUserSelect = document.getElementById('details-user-select');
+
+
 
 
     // --- 2. 초기화 및 데이터 갱신 ---
@@ -192,6 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (currentCategoryFilter === '전체') return true;
             return p.category === currentCategoryFilter;
         });
+        filteredProjects.sort((a, b) => a.priority - b.priority);
 
         // [핵심 수정] 2. 필터링된 결과를 기준으로 각 상태별 목록을 나눕니다.
         const activeProjects = filteredProjects.filter(p => p.status === 'active');
@@ -249,6 +254,10 @@ document.addEventListener('DOMContentLoaded', () => {
         detailsModalTitle.textContent = project.name;
         detailsPrioritySelect.value = project.priority;
         detailsCategorySelect.value = project.category;
+        // [신규] 담당자 선택 목록 렌더링
+        detailsUserSelect.innerHTML = appData.users.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
+        // 담당자가 없는 경우(NULL)를 대비하여 || '' 추가
+        detailsUserSelect.value = project.user_id || '';
         detailsDeadlineInput.value = formatDateToYYYYMMDD(project.deadline);
 
         detailsTaskList.innerHTML = '';
@@ -291,6 +300,16 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
             commentsList.appendChild(commentEl);
+        });
+
+        if (sortable_tasks) sortable_tasks.destroy(); // 기존 인스턴스가 있으면 파괴
+        sortable_tasks = new Sortable(detailsTaskList, {
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            chosenClass: 'sortable-chosen',
+            onEnd: handleTaskReorder, // 드래그가 끝나면 실행될 함수
+            filter: 'input[type="range"]',
+            preventOnFilter: false
         });
 
         initializeProjectCalendar(project);
@@ -387,6 +406,7 @@ document.addEventListener('DOMContentLoaded', () => {
         confirmDeleteBtn.addEventListener('click', handleConfirmProjectDelete);
         detailsPrioritySelect.addEventListener('change', handlePriorityChange);
         detailsCategorySelect.addEventListener('change', handleCategoryChange);
+        detailsUserSelect.addEventListener('change', handleAssigneeChange);
         detailsDeadlineInput.addEventListener('change', handleDeadlineChange);
         detailsTaskList.addEventListener('change', (e) => { if (e.target.type === 'range') updateProgress('task', e.target.dataset.taskId, e.target.value); if (e.target.classList.contains('deadline-input')) handleTaskDeadlineEdit(e.target.dataset.taskId, e.target.value); });
         detailsTaskList.addEventListener('focusout', (e) => { if (e.target.classList.contains('task-content-input')) handleTaskContentEdit(e.target.dataset.taskId, e.target.value); });
@@ -435,7 +455,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // 팝업 외부 클릭 시 닫기
-        [projectModal, detailsModal, postModal, postViewModal].forEach(modal => {
+        [detailsModal, postModal, postViewModal].forEach(modal => {
             modal.addEventListener('click', (e) => { if (e.target === modal) modal.close(); });
         });
     }
@@ -463,6 +483,30 @@ document.addEventListener('DOMContentLoaded', () => {
         renderProjects();
     }
 
+    async function handleTaskReorder(evt) {
+        const project = appData.projects.find(p => p.id === currentOpenProjectId);
+        if (!project) return;
+
+        // 1. 로컬 데이터(appData)의 순서를 드래그 결과에 맞춰 즉시 변경
+        const movedTask = project.tasks.splice(evt.oldIndex, 1)[0];
+        project.tasks.splice(evt.newIndex, 0, movedTask);
+
+        // 2. 서버에 새로운 순서의 ID 배열을 전송 (낙관적 업데이트)
+        const orderedTaskIds = project.tasks.map(t => t.id);
+        try {
+            const response = await fetch('/api/tasks/reorder', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ task_ids: orderedTaskIds })
+            });
+            if (!response.ok) throw new Error('Server error');
+        } catch (error) {
+            console.error("업무 순서 변경 실패:", error);
+            showToast("업무 순서 저장에 실패했습니다. 데이터를 새로고침합니다.");
+            refreshDataAndRender(); // 실패 시에는 전체 데이터를 다시 불러와 동기화
+        }
+    }
+
     async function handleUserAdd() {
         const name = newUserNameInput.value.trim();
         if (!name) return;
@@ -476,7 +520,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderUserPopup();
             }
         } catch (error) {
-            alert('사용자 추가에 실패했습니다.');
+            showToast('사용자 추가에 실패했습니다.');
+        }
+    }
+
+    async function refreshDataAndRender(savedUserId = null) {
+        const loadingOverlay = document.getElementById('loading-overlay'); // 로딩 요소 가져오기
+
+        try {
+            const headers = {};
+            if (currentUser) {
+                headers['X-Current-User-ID'] = currentUser.id;
+            }
+            const response = await fetch('/api/data', { headers });
+            if (!response.ok) throw new Error(`API 요청 실패: ${response.status}`);
+            appData = await response.json();
+
+            if (savedUserId && appData.users.some(u => u.id == savedUserId)) {
+                currentUser = appData.users.find(u => u.id == savedUserId);
+            } else if ((!currentUser || !appData.users.some(u => u.id === currentUser.id)) && appData.users.length > 0) {
+                currentUser = appData.users[0];
+            }
+
+            renderAll();
+        } catch (error) {
+            console.error('데이터 갱신 실패:', error);
+            // 여기에 에러 메시지를 사용자에게 보여주는 로직을 추가할 수도 있습니다.
+        } finally {
+
+            loadingOverlay.classList.add('hidden');
         }
     }
 
@@ -498,7 +570,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`/api/user/${userId}`, { method: 'DELETE' });
             if (!response.ok) throw new Error('Server error');
         } catch (error) {
-            alert('사용자 삭제에 실패했습니다. 원래대로 복구합니다.');
+            showToast('사용자 삭제에 실패했습니다. 원래대로 복구합니다.');
             appData.users = originalUsers;
             if (userToDelete && currentUser?.id != userToDelete.id) {
                 currentUser = appData.users.find(u => u.id === currentUser.id);
@@ -548,7 +620,7 @@ document.addEventListener('DOMContentLoaded', () => {
             project.comments[commentIndex] = updatedComment;
 
         } catch (error) {
-            alert('코멘트 수정에 실패했습니다.');
+            showToast('코멘트 수정에 실패했습니다.');
             project.comments[commentIndex] = originalComment; // 롤백
         }
         renderDetailsModal();
@@ -570,7 +642,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             renderDetailsModal();
         } catch (error) {
-            alert('코멘트 추가에 실패했습니다.');
+            showToast('코멘트 추가에 실패했습니다.');
             commentInput.value = text;
         }
     }
@@ -582,15 +654,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!project) return;
         const originalTasks = [...project.tasks];
         project.tasks = project.tasks.filter(t => t.id != taskId);
+
+        updateProjectProgress(project.id); // 업무 삭제 후 프로젝트 진행도 재계산
         renderDetailsModal();
+        renderProjects(); // 메인 리스트의 진행도도 업데이트
 
         try {
             const response = await fetch(`/api/task/${taskId}`, { method: 'DELETE' });
             if (!response.ok) throw new Error('Server error');
+            showToast('업무가 삭제되었습니다.'); // <-- 성공 알림 추가
         } catch (error) {
-            alert('업무 삭제에 실패했습니다.');
+            showToast('업무 삭제에 실패했습니다.');
             project.tasks = originalTasks;
+            updateProjectProgress(project.id); // 롤백 후에도 재계산
             renderDetailsModal();
+            renderProjects();
         }
     }
 
@@ -607,8 +685,9 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch(`/api/comment/${commentId}`, { method: 'DELETE' });
             if (!response.ok) throw new Error('Server error');
+            showToast('코멘트가 삭제되었습니다.'); // <-- 성공 알림 추가
         } catch (error) {
-            alert('코멘트 삭제에 실패했습니다.');
+            showToast('코멘트 삭제에 실패했습니다.');
             project.comments = originalComments;
             renderDetailsModal();
         }
@@ -630,7 +709,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`/api/project/${currentOpenProjectId}/status`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: newStatus }) });
             if (!response.ok) throw new Error('Server error');
         } catch (error) {
-            alert(`프로젝트 상태 변경에 실패했습니다.`);
+            showToast(`프로젝트 상태 변경에 실패했습니다.`);
             project.status = originalStatus;
             renderAll();
         }
@@ -653,7 +732,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (!response.ok) throw new Error('Server error');
         } catch (error) {
-            alert('카테고리 변경에 실패했습니다.');
+            showToast('카테고리 변경에 실패했습니다.');
             project.category = originalCategory; // 오류 시 원래대로 롤백
             renderAll();
         }
@@ -672,7 +751,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!project) return;
 
         const projectIndex = appData.projects.findIndex(p => p.id === currentOpenProjectId);
-        const originalProjects = [...appData.projects];
+        const originalProjects = [...appData.projects]; // <-- 버그 수정을 위해 위치 변경
+
         appData.projects.splice(projectIndex, 1);
         renderAll();
         detailsModal.close();
@@ -680,9 +760,9 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch(`/api/project/${project.id}`, { method: 'DELETE' });
             if (!response.ok) throw new Error('Server error');
-            alert('프로젝트가 성공적으로 삭제되었습니다.');
+            showToast('프로젝트가 성공적으로 삭제되었습니다.');
         } catch (error) {
-            alert('프로젝트 삭제에 실패했습니다.');
+            showToast('프로젝트 삭제에 실패했습니다.');
             appData.projects = originalProjects;
             renderAll();
         }
@@ -690,6 +770,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function handleFormSubmit(e) {
         e.preventDefault();
+
+        // 1. 제출 버튼을 찾습니다.
+        const submitBtn = projectForm.querySelector('button[type="submit"]');
+
         const tasks = [];
         document.querySelectorAll('#modal-task-list > div').forEach(field => {
             const content = field.querySelector('.task-content-input').value.trim();
@@ -700,6 +784,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const newProjectData = { name: document.getElementById('project-name-input').value, user_id: parseInt(document.getElementById('project-user-select').value), priority: parseInt(document.getElementById('project-priority-select').value), status: projectForm.querySelector('input[name="status"]:checked').value, category: document.getElementById('project-category-select').value, start_date: document.getElementById('project-start-date').value, deadline: document.getElementById('project-deadline').value || null, tasks };
 
         try {
+            // 2. 버튼을 비활성화하고 텍스트를 변경해 처리 중임을 알립니다.
+            submitBtn.disabled = true;
+            submitBtn.textContent = '생성 중...';
+
             const response = await fetch('/api/project', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newProjectData) });
             if (!response.ok) throw new Error('Server error');
             const newProject = await response.json();
@@ -707,7 +795,11 @@ document.addEventListener('DOMContentLoaded', () => {
             renderAll();
             projectModal.close();
         } catch (error) {
-            alert('프로젝트 생성에 실패했습니다.');
+            showToast('프로젝트 생성에 실패했습니다.');
+        } finally {
+            // 3. (중요) 요청 성공/실패 여부와 관계없이 버튼을 다시 활성화합니다.
+            submitBtn.disabled = false;
+            submitBtn.textContent = '생성';
         }
     }
 
@@ -724,9 +816,41 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`/api/project/${currentOpenProjectId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ priority: newPriority }) });
             if (!response.ok) throw new Error('Server error');
         } catch (error) {
-            alert('우선순위 변경에 실패했습니다.');
+            showToast('우선순위 변경에 실패했습니다.');
             project.priority = originalPriority;
             renderProjects();
+        }
+    }
+
+    async function handleAssigneeChange(e) {
+        const newUserId = parseInt(e.target.value);
+        const project = appData.projects.find(p => p.id === currentOpenProjectId);
+        if (!project || project.user_id === newUserId) return;
+
+        const originalUserId = project.user_id;
+        project.user_id = newUserId;
+        renderAll(); // 화면에 즉시 반영
+
+        try {
+            const response = await fetch(`/api/project/${currentOpenProjectId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: newUserId })
+            });
+            if (!response.ok) throw new Error('Server error');
+
+            // 서버 최종 데이터로 로컬 데이터 업데이트
+            const updatedProject = await response.json();
+            const projectIndex = appData.projects.findIndex(p => p.id === updatedProject.id);
+            if (projectIndex !== -1) {
+                appData.projects[projectIndex] = updatedProject;
+            }
+            renderAll();
+
+        } catch (error) {
+            showToast('담당자 변경에 실패했습니다.');
+            project.user_id = originalUserId; // 오류 시 롤백
+            renderAll();
         }
     }
 
@@ -743,7 +867,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`/api/project/${currentOpenProjectId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ deadline: newDeadline }) });
             if (!response.ok) throw new Error('Server error');
         } catch (error) {
-            alert('마감일 변경에 실패했습니다.');
+            showToast('마감일 변경에 실패했습니다.');
             project.deadline = originalDeadline;
             renderAll();
         }
@@ -761,7 +885,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`/api/task/${taskId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: newContent }) });
             if (!response.ok) throw new Error('Server error');
         } catch (error) {
-            alert("업무 내용 저장에 실패했습니다.");
+            showToast("업무 내용 저장에 실패했습니다.");
             task.content = originalContent;
             renderDetailsModal();
         }
@@ -782,7 +906,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`/api/task/${taskId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ deadline: newDeadline }) });
             if (!response.ok) throw new Error('Server error');
         } catch (error) {
-            alert('업무 마감일 저장에 실패했습니다.');
+            showToast('업무 마감일 저장에 실패했습니다.');
             task.deadline = originalDeadline;
             renderDetailsModal();
             initializeProjectCalendar(project);
@@ -828,7 +952,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             console.error("Progress update failed:", error);
-            alert("진행도 업데이트에 실패했습니다. 원래대로 복구합니다.");
+            showToast("진행도 업데이트에 실패했습니다. 원래대로 복구합니다.");
             appData.projects[projectIndex].progress = originalProjectProgress;
             if (type === 'task') {
                 appData.projects[projectIndex].tasks[taskIndex].progress = originalTaskProgress;
@@ -853,7 +977,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 newTaskInput.focus();
             }
         } catch (error) {
-            alert('업무 추가에 실패했습니다.');
+            showToast('업무 추가에 실패했습니다.');
         }
     }
 
@@ -890,7 +1014,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderAll(); // 최종 데이터로 화면 동기화
 
         } catch (error) {
-            alert('이름 변경에 실패했습니다.');
+            showToast('이름 변경에 실패했습니다.');
             project.name = originalName; // 롤백
             renderAll();
         }
@@ -938,9 +1062,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function handlePostFormSubmit(e) {
         e.preventDefault();
+
+        // 1. 제출 버튼을 찾습니다.
+        const submitBtn = postForm.querySelector('button[type="submit"]');
+
         const postId = postIdInput.value;
         const postData = { title: postTitleInput.value, content: postContentTextarea.value, user_id: currentUser.id };
+
         try {
+            // 2. 버튼을 비활성화하고 처리 중임을 알립니다.
+            submitBtn.disabled = true;
+            submitBtn.textContent = '저장 중...';
+
             const url = postId ? `/api/post/${postId}` : '/api/post';
             const method = postId ? 'PUT' : 'POST';
             const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(postData) });
@@ -955,7 +1088,11 @@ document.addEventListener('DOMContentLoaded', () => {
             renderSidebar();
             postModal.close();
         } catch (error) {
-            alert('게시글 저장에 실패했습니다.');
+            showToast('게시글 저장에 실패했습니다.');
+        } finally {
+            // 3. (중요) 성공/실패 여부와 관계없이 버튼을 다시 활성화합니다.
+            submitBtn.disabled = false;
+            submitBtn.textContent = '저장';
         }
     }
 
@@ -980,8 +1117,9 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const response = await fetch(`/api/post/${currentOpenPostId}`, { method: 'DELETE' });
                 if (!response.ok) throw new Error('Server error');
+                showToast('게시글이 삭제되었습니다.'); // <-- 성공 알림 추가
             } catch (error) {
-                alert('게시글 삭제에 실패했습니다.');
+                showToast('게시글 삭제에 실패했습니다.');
                 appData.posts = originalPosts;
                 renderSidebar();
             }
@@ -1020,7 +1158,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function getProjectColor(projectId) { const colors = [{ main: '#20c997', background: '#e9fbf5' }, { main: '#fd7e14', background: '#fff4e7' }, { main: '#6610f2', background: '#f0e7fd' }, { main: '#0d6efd', background: '#e7f0ff' }, { main: '#d63384', background: '#faeaf1' }, { main: '#198754', background: '#e8f3ee' }]; return colors[((projectId || 0) - 1 + colors.length) % colors.length]; }
     function calculateDday(deadline) { if (!deadline) return { text: '미정', isUrgent: false }; const today = new Date(); const deadlineDate = new Date(deadline); today.setHours(0, 0, 0, 0); deadlineDate.setHours(0, 0, 0, 0); const diffTime = deadlineDate - today; const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); if (diffDays === 0) { return { text: 'D-Day', isUrgent: true }; } else if (diffDays < 0) { return { text: `D+${Math.abs(diffDays)}`, isUrgent: false }; } else { return { text: `D-${diffDays}`, isUrgent: diffDays <= 7 }; } }
     function formatDateToYYYYMMDD(dateString) { if (!dateString) return ''; const date = new Date(dateString); const year = date.getFullYear(); const month = String(date.getMonth() + 1).padStart(2, '0'); const day = String(date.getDate()).padStart(2, '0'); return `${year}-${month}-${day}`; }
-
-    // --- 앱 시작 ---
+    function showToast(message) { const container = document.getElementById('toast-container'); if (!container) { console.error('Toast container not found!'); return; } const toast = document.createElement('div'); toast.className = 'toast-message'; toast.textContent = message; container.appendChild(toast); toast.addEventListener('animationend', () => { toast.remove(); }); }    // --- 앱 시작 ---
+    function updateProjectProgress(projectId) { const project = appData.projects.find(p => p.id === projectId); if (!project || project.tasks.length === 0) { if (project) project.progress = 0; return; } const totalProgress = project.tasks.reduce((sum, t) => sum + t.progress, 0); project.progress = Math.round(totalProgress / project.tasks.length); }
     initializeApp();
 });

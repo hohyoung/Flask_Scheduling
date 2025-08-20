@@ -46,7 +46,8 @@ def init_db():
                     content TEXT NOT NULL,
                     deadline DATE,
                     progress INTEGER DEFAULT 0,
-                    is_current INTEGER DEFAULT 0
+                    is_current INTEGER DEFAULT 0,
+                    task_order INTEGER DEFAULT 0
                 );
             """)
             cur.execute("""

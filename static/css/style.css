@@ -116,12 +116,19 @@ dialog::backdrop { background: rgba(0,0,0,0.6); }
 .details-modal-left { padding: 30px; overflow-y: auto; border-right: 1px solid var(--color-border); display: flex; flex-direction: column; }
 .details-modal-right { padding: 20px; overflow-y: hidden; }
 .details-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.details-header h3 { margin: 0; }
+.details-header h3, .details-header input.title-edit-input { margin: 0; font-size: 24px; font-weight: 700; font-family: inherit; }
+input.title-edit-input { border: 1px solid var(--color-primary); border-radius: 5px; padding: 4px 8px; width: 50%; }
 .details-controls { display: flex; align-items: center; gap: 10px; }
 .details-controls select, .details-controls input[type="date"] { -webkit-appearance: none; -moz-appearance: none; appearance: none; background-color: var(--color-surface); border: 1px solid var(--color-border); border-radius: 20px; padding: 8px 30px 8px 15px; font-size: 14px; font-weight: 500; font-family: inherit; cursor: pointer; background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 10px center; background-size: 12px; transition: border-color 0.2s, box-shadow 0.2s; }
 .details-controls select:focus, .details-controls input[type="date"]:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.15); }
 #details-modal-footer { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 20px 30px; border-top: 1px solid var(--color-border); box-sizing: border-box; }
 .footer-buttons-right { display: flex; gap: 10px; }
+.details-controls select, .details-controls input[type="date"] { -webkit-appearance: none; -moz-appearance: none; appearance: none; background-color: var(--color-surface); border: 1px solid var(--color-border); border-radius: 20px; padding: 8px 30px 8px 15px; font-size: 14px; font-weight: 500; font-family: inherit; cursor: pointer; background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 10px center; background-size: 12px; transition: border-color 0.2s, box-shadow 0.2s; }
+
+/* --- [신규] 드래그 앤 드롭 관련 스타일 --- */
+.task-item-popup.sortable-ghost { opacity: 0.4; background: #e7f0ff; }
+.task-item-popup.sortable-chosen {    cursor: grabbing; }
+
 
 /* --- 상세 팝업 내 세부 업무 --- */
 .details-modal-left h4 { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--color-border); }
@@ -196,3 +203,83 @@ dialog::backdrop { background: rgba(0,0,0,0.6); }
    6. 캘린더
    ================================= */
 #calendar { background-color: var(--color-surface); padding: 20px; border-radius: 8px; border: 1px solid var(--color-border); }
+
+
+/* =================================
+   7. 로딩 오버레이 (신규 추가)
+   ================================= */
+.loading-overlay {
+    position: fixed; /* 화면 전체에 고정 */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.8); /* 반투명 흰색 배경 */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999; /* 다른 모든 요소 위에 표시 */
+    transition: opacity 0.5s ease; /* 부드럽게 사라지는 효과 */
+    opacity: 1;
+}
+
+.loading-overlay.hidden {
+    opacity: 0;
+    pointer-events: none; /* 숨겨졌을 때 클릭되지 않도록 설정 */
+}
+
+.spinner {
+    width: 60px;
+    height: 60px;
+    border: 6px solid #f3f3f3; /* 스피너의 회색 부분 */
+    border-top: 6px solid var(--color-primary); /* 스피너의 파란색 부분 */
+    border-radius: 50%;
+    animation: spin 1.2s linear infinite; /* 회전 애니메이션 */
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+
+/* =================================
+   8. 토스트 알림 (신규 추가)
+   ================================= */
+.toast-container {
+    position: fixed;
+    bottom: 25px;
+    right: 25px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-end;
+}
+
+.toast-message {
+    background-color: rgba(33, 37, 41, 0.85); /* --color-text 변수와 유사한 어두운 배경 */
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    font-size: 15px;
+    animation: fadeInOut 3s ease-in-out forwards;
+    backdrop-filter: blur(5px); /* 배경 블러 효과 (지원 브라우저) */
+    -webkit-backdrop-filter: blur(5px);
+}
+
+@keyframes fadeInOut {
+    0% {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    15%, 85% { /* 15%까지 나타나서 85%까지 유지 */
+        opacity: 1;
+        transform: translateY(0);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+}

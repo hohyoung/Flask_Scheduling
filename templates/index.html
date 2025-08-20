@@ -6,11 +6,16 @@
     <title>DI SCHEDULING</title>
     
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
+
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="spinner"></div>
+    </div>
 
     <div class="container">
         <header>
@@ -152,6 +157,7 @@
                     <h3 id="details-modal-title"></h3>
                     <input type="text" id="title-edit-input" class="title-edit-input" style="display: none;">
                     <div class="details-controls">
+                        <select id="details-user-select"></select>
                         <select id="details-category-select">
                             <option value="문서">문서</option>
                             <option value="개발">개발</option>
@@ -198,7 +204,7 @@
             <button type="button" id="confirm-delete-btn" style="display: none;">삭제 최종 확인</button>
         </div>
     </dialog>
-
+    <div id="toast-container" class="toast-container"></div>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
