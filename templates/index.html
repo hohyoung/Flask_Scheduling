@@ -1,29 +1,22 @@
 <!DOCTYPE html>
 <html lang="ko">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DI SCHEDULING</title>
-
+    
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
-    <link rel="stylesheet" as="style" crossorigin
-        href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-
 <body>
 
     <div class="container">
         <header>
             <div class="header-left">
                 <button id="board-toggle-btn" title="공유 게시판 열기">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                        <path
-                            d="M20 22H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1zm-1-2V4H5v16h14zM7 6h4v4H7V6zm0 6h10v2H7v-2zm0 4h10v2H7v-2zm6-8h4v4h-4V6z">
-                        </path>
-                    </svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M20 22H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1zm-1-2V4H5v16h14zM7 6h4v4H7V6zm0 6h10v2H7v-2zm0 4h10v2H7v-2zm6-8h4v4h-4V6z"></path></svg>
                 </button>
                 <h1>DI SCHEDULING</h1>
             </div>
@@ -41,10 +34,7 @@
 
         <section class="controls">
             <button id="add-project-btn">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20px"
-                    height="20px">
-                    <path d="M11 11V5h2v6h6v2h-6v6h-2v-6H5v-2h6z"></path>
-                </svg>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20px" height="20px"><path d="M11 11V5h2v6h6v2h-6v6h-2v-6H5v-2h6z"></path></svg>
                 <span>새 프로젝트</span>
             </button>
             <div id="category-filters" class="category-filters">
@@ -116,10 +106,10 @@
 
     <dialog id="project-modal">
         <form id="project-form">
-            <h3>새 프로젝트 생성</h3>
-            <input type="text" id="project-name-input" placeholder="프로젝트 이름" required>
-            <select id="project-user-select" required></select>
-            <div class="form-row">
+             <h3>새 프로젝트 생성</h3>
+             <input type="text" id="project-name-input" placeholder="프로젝트 이름" required>
+             <select id="project-user-select" required></select>
+             <div class="form-row">
                 <select id="project-category-select">
                     <option value="문서">문서</option>
                     <option value="개발">개발</option>
@@ -131,8 +121,8 @@
                     <option value="2">보통</option>
                     <option value="3">낮음</option>
                 </select>
-            </div>
-            <div class="status-radios">
+             </div>
+             <div class="status-radios">
                 <label class="custom-radio">
                     <input type="radio" name="status" value="scheduled" checked>
                     <span>예정</span>
@@ -141,17 +131,17 @@
                     <input type="radio" name="status" value="active">
                     <span>진행</span>
                 </label>
-            </div>
-            <div class="form-row">
+             </div>
+             <div class="form-row">
                 <input type="date" id="project-start-date" required title="시작일">
                 <input type="date" id="project-deadline" title="마감일">
-            </div>
-            <div id="modal-task-list"></div>
-            <button type="button" id="add-task-field-btn">세부 업무 추가</button>
-            <div class="form-buttons">
-                <button type="button" id="close-modal-btn" class="cancel-btn">취소</button>
-                <button type="submit">생성</button>
-            </div>
+             </div>
+             <div id="modal-task-list"></div>
+             <button type="button" id="add-task-field-btn">세부 업무 추가</button>
+             <div class="form-buttons">
+                 <button type="button" id="close-modal-btn" class="cancel-btn">취소</button>
+                 <button type="submit">생성</button>
+             </div>
         </form>
     </dialog>
 
@@ -160,6 +150,7 @@
             <div class="details-modal-left">
                 <div class="details-header">
                     <h3 id="details-modal-title"></h3>
+                    <input type="text" id="title-edit-input" class="title-edit-input" style="display: none;">
                     <div class="details-controls">
                         <select id="details-category-select">
                             <option value="문서">문서</option>
@@ -177,10 +168,7 @@
                 <h4>
                     <span>세부 업무</span>
                     <button id="add-detail-task-btn">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                            fill="currentColor">
-                            <path d="M11 11V5h2v6h6v2h-6v6h-2v-6H5v-2h6z"></path>
-                        </svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M11 11V5h2v6h6v2h-6v6h-2v-6H5v-2h6z"></path></svg>
                         <span>업무 추가</span>
                     </button>
                 </h4>
@@ -213,5 +201,4 @@
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
-
 </html>

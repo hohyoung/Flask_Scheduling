@@ -63,6 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const editPostBtn = document.getElementById('edit-post-btn');
     const deletePostBtn = document.getElementById('delete-post-btn');
     const categoryFiltersEl = document.getElementById('category-filters');
+    const detailsModalTitleInput = document.getElementById('title-edit-input');
 
 
     // --- 2. 초기화 및 데이터 갱신 ---
@@ -320,13 +321,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const projectColors = getProjectColor(project.id);
             const assignee = appData.users.find(u => u.id === project.user_id);
             const assigneeName = assignee ? ` ${assignee.name}` : '';
-            events.push({
-                title: `[P${assigneeName}] ${project.name}`,
-                start: formatDateToYYYYMMDD(project.start_date),
-                end: formatDateToYYYYMMDD(project.deadline),
-                backgroundColor: projectColors.main,
-                borderColor: projectColors.main
-            });
+            if (project.deadline) {
+                events.push({
+                    title: `[P${assigneeName}] ${project.name}`,
+                    start: formatDateToYYYYMMDD(project.start_date),
+                    end: formatDateToYYYYMMDD(project.deadline),
+                    backgroundColor: projectColors.main,
+                    borderColor: projectColors.main
+                });
+            }
             project.tasks.forEach(task => {
                 if (task.deadline) {
                     events.push({ title: `[업무] ${task.content}`, start: formatDateToYYYYMMDD(task.deadline), allDay: true, backgroundColor: '#6c757d' });
@@ -396,7 +399,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         detailsTaskList.addEventListener('click', (e) => { if (e.target.classList.contains('delete-task-btn')) { handleTaskDelete(e.target.dataset.taskId); } });
         addCommentBtn.addEventListener('click', handleAddComment);
-        commentsList.addEventListener('click', (e) => { if (e.target.classList.contains('delete-comment-btn')) { handleCommentDelete(e.target.dataset.commentId); } if (e.target.classList.contains('edit-comment-btn')) { const commentItem = e.target.closest('.comment-item'); const currentContent = commentItem.querySelector('.comment-text-content span:last-child').textContent; const newContent = prompt('코멘트를 수정하세요:', currentContent); if (newContent && newContent.trim() !== currentContent) { handleCommentEdit(commentItem.dataset.commentId, newContent.trim()); } } });
+        commentsList.addEventListener('click', (e) => { const item = e.target.closest('.comment-item'); if (!item) return; const commentId = item.dataset.commentId; if (e.target.classList.contains('delete-comment-btn')) { handleCommentDelete(commentId); return; } if (e.target.classList.contains('edit-comment-btn')) { const currentText = item.querySelector('.comment-text-content span:last-child')?.textContent?.trim() || ''; const newContent = prompt('코멘트를 수정하세요', currentText); if (newContent && newContent.trim()) { handleCommentEdit(commentId, newContent.trim()); } } });
         detailsModalTitle.addEventListener('click', handleTitleEdit);
         addDetailTaskBtn.addEventListener('click', handleAddNewTaskInDetail);
 
@@ -522,6 +525,34 @@ document.addEventListener('DOMContentLoaded', () => {
         renderProjects();
     }
 
+    async function handleCommentEdit(commentId, newContent) {
+        const project = appData.projects.find(p => p.comments.some(c => c.id == commentId));
+        if (!project) return;
+        const commentIndex = project.comments.findIndex(c => c.id == commentId);
+        if (commentIndex === -1) return;
+
+        const originalComment = { ...project.comments[commentIndex] };
+        project.comments[commentIndex].content = newContent; // 낙관적 업데이트
+        renderDetailsModal();
+
+        try {
+            const response = await fetch(`/api/comment/${commentId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: newContent })
+            });
+            if (!response.ok) throw new Error('Server error');
+
+            const updatedComment = await response.json();
+            // 서버 최종 데이터로 교체
+            project.comments[commentIndex] = updatedComment;
+
+        } catch (error) {
+            alert('코멘트 수정에 실패했습니다.');
+            project.comments[commentIndex] = originalComment; // 롤백
+        }
+        renderDetailsModal();
+    }
     async function handleAddComment() {
         const text = commentInput.value.trim();
         if (!text || !currentOpenProjectId) return;
@@ -568,6 +599,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const project = appData.projects.find(p => p.comments.some(c => c.id == commentId));
         if (!project) return;
+
         const originalComments = [...project.comments];
         project.comments = project.comments.filter(c => c.id != commentId);
         renderDetailsModal();
@@ -825,40 +857,43 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function handleTitleEdit(e) {
-        const titleElement = e.target;
+    async function handleTitleEdit(e) {
         const project = appData.projects.find(p => p.id === currentOpenProjectId);
         if (!project) return;
+
+        // 1. prompt 창으로 새 프로젝트 이름을 입력받음
+        const newName = prompt("새 프로젝트 이름을 입력하세요:", project.name);
+
+        // 2. 사용자가 취소했거나, 이름이 비어있거나, 이전 이름과 같으면 아무것도 하지 않음
+        if (newName === null || newName.trim() === '' || newName.trim() === project.name) {
+            return;
+        }
+
         const originalName = project.name;
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.value = originalName;
-        input.className = 'title-edit-input';
-        input.style.fontSize = '24px';
-        input.style.fontWeight = 'bold';
-        input.style.border = '1px solid #007bff';
-        input.style.borderRadius = '5px';
-        titleElement.replaceWith(input);
-        input.focus();
-        const saveChange = async () => {
-            const newName = input.value.trim();
-            if (newName && newName !== originalName) {
-                await handleGenericUpdate(
-                    () => fetch(`/api/project/${currentOpenProjectId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newName }) }),
-                    (updatedProject) => {
-                        const projectIndex = appData.projects.findIndex(p => p.id === updatedProject.id);
-                        if (projectIndex > -1) appData.projects[projectIndex] = updatedProject;
-                    }
-                );
-            } else {
-                renderDetailsModal();
+        project.name = newName.trim();
+        renderAll(); // 3. 낙관적 업데이트: 일단 화면에 새 이름 반영
+
+        // 4. 서버에 변경사항 저장 및 오류 시 롤백
+        try {
+            const response = await fetch(`/api/project/${currentOpenProjectId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: newName.trim() })
+            });
+            if (!response.ok) throw new Error('Server error');
+
+            const updatedProject = await response.json();
+            const projectIndex = appData.projects.findIndex(p => p.id === updatedProject.id);
+            if (projectIndex !== -1) {
+                appData.projects[projectIndex] = { ...appData.projects[projectIndex], ...updatedProject };
             }
-        };
-        input.addEventListener('blur', saveChange);
-        input.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') input.blur();
-            else if (event.key === 'Escape') renderDetailsModal();
-        });
+            renderAll(); // 최종 데이터로 화면 동기화
+
+        } catch (error) {
+            alert('이름 변경에 실패했습니다.');
+            project.name = originalName; // 롤백
+            renderAll();
+        }
     }
 
     function toggleSidebar() {
@@ -983,7 +1018,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function getShortName(name) { if (name === 'DI 팀') { return 'DI'; } if (name && name.length > 1) { return name.substring(1).trim().replace(/\s/g, ''); } return name; }
     function getUserColor(userId) { const colors = ['#6d6875', '#b5838d', '#e5989b', '#ffb4a2', '#ffcdb2']; return colors[((userId || 0) - 1 + colors.length) % colors.length]; }
     function getProjectColor(projectId) { const colors = [{ main: '#20c997', background: '#e9fbf5' }, { main: '#fd7e14', background: '#fff4e7' }, { main: '#6610f2', background: '#f0e7fd' }, { main: '#0d6efd', background: '#e7f0ff' }, { main: '#d63384', background: '#faeaf1' }, { main: '#198754', background: '#e8f3ee' }]; return colors[((projectId || 0) - 1 + colors.length) % colors.length]; }
-    function calculateDday(deadline) { if (!deadline) return { text: '', isUrgent: false }; const today = new Date(); const deadlineDate = new Date(deadline); today.setHours(0, 0, 0, 0); deadlineDate.setHours(0, 0, 0, 0); const diffTime = deadlineDate - today; const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); if (diffDays === 0) { return { text: 'D-Day', isUrgent: true }; } else if (diffDays < 0) { return { text: `D+${Math.abs(diffDays)}`, isUrgent: false }; } else { return { text: `D-${diffDays}`, isUrgent: diffDays <= 7 }; } }
+    function calculateDday(deadline) { if (!deadline) return { text: '미정', isUrgent: false }; const today = new Date(); const deadlineDate = new Date(deadline); today.setHours(0, 0, 0, 0); deadlineDate.setHours(0, 0, 0, 0); const diffTime = deadlineDate - today; const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); if (diffDays === 0) { return { text: 'D-Day', isUrgent: true }; } else if (diffDays < 0) { return { text: `D+${Math.abs(diffDays)}`, isUrgent: false }; } else { return { text: `D-${diffDays}`, isUrgent: diffDays <= 7 }; } }
     function formatDateToYYYYMMDD(dateString) { if (!dateString) return ''; const date = new Date(dateString); const year = date.getFullYear(); const month = String(date.getMonth() + 1).padStart(2, '0'); const day = String(date.getDate()).padStart(2, '0'); return `${year}-${month}-${day}`; }
 
     // --- 앱 시작 ---
