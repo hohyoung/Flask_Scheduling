@@ -9,10 +9,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentOpenPostId = null;
     let currentCategoryFilter = '전체';
 
-
     const projectListEl = document.getElementById('project-list');
     const completedProjectListEl = document.getElementById('completed-project-list');
+    const scheduledProjectListEl = document.getElementById('scheduled-project-list');
     const completedProjectsSection = document.getElementById('completed-projects-section');
+    const scheduledProjectsSection = document.getElementById('scheduled-projects-section');
+    const activeProjectsSection = document.getElementById('active-projects-section');
     const calendarEl = document.getElementById('calendar');
     const currentUserIcon = document.getElementById('current-user-icon');
     const userPopup = document.getElementById('user-popup');
@@ -29,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const detailsModalTitle = document.getElementById('details-modal-title');
     const detailsPrioritySelect = document.getElementById('details-priority-select');
     const detailsDeadlineInput = document.getElementById('details-deadline-input');
+    const detailsCategorySelect = document.getElementById('details-category-select');
     const detailsTaskList = document.getElementById('details-task-list');
     const projectCalendarEl = document.getElementById('project-calendar');
     const commentsList = document.getElementById('comments-list');
@@ -37,6 +40,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeDetailsModalBtn = document.getElementById('close-details-modal-btn');
     const completeProjectBtn = document.getElementById('complete-project-btn');
     const restoreProjectBtn = document.getElementById('restore-project-btn');
+    const setStatusActiveBtn = document.getElementById('set-status-active-btn');
+    const setStatusScheduledBtn = document.getElementById('set-status-scheduled-btn');
     const deleteProjectBtn = document.getElementById('delete-project-btn');
     const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
     const addDetailTaskBtn = document.getElementById('add-detail-task-btn');
@@ -178,29 +183,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderProjects() {
         projectListEl.innerHTML = '';
-        scheduledProjectListEl.innerHTML = ''; // 새로 추가된 리스트
+        scheduledProjectListEl.innerHTML = '';
         completedProjectListEl.innerHTML = '';
 
-        // 1. 카테고리 필터링
+        // [핵심 수정] 1. 현재 선택된 카테고리에 따라 전체 프로젝트를 먼저 필터링합니다.
         const filteredProjects = appData.projects.filter(p => {
             if (currentCategoryFilter === '전체') return true;
             return p.category === currentCategoryFilter;
         });
 
-        // 2. 상태별로 프로젝트 분리
+        // [핵심 수정] 2. 필터링된 결과를 기준으로 각 상태별 목록을 나눕니다.
         const activeProjects = filteredProjects.filter(p => p.status === 'active');
         const scheduledProjects = filteredProjects.filter(p => p.status === 'scheduled');
         const completedProjects = filteredProjects.filter(p => p.status === 'completed');
 
-        // 3. 각 리스트 렌더링
+        // 3. 각 리스트를 렌더링합니다.
         activeProjects.forEach(p => projectListEl.appendChild(createProjectElement(p)));
         scheduledProjects.forEach(p => scheduledProjectListEl.appendChild(createProjectElement(p)));
-        completedProjects.forEach(p => completedProjectListEl.appendChild(createProjectElement(p)));
+        completedProjects.forEach(p => {
+            const el = createProjectElement(p);
+            el.classList.add('completed');
+            completedProjectListEl.appendChild(el);
+        });
 
-        // 섹션 표시 여부 제어
-        document.getElementById('active-projects-section').style.display = activeProjects.length > 0 ? 'block' : 'none';
-        document.getElementById('scheduled-projects-section').style.display = scheduledProjects.length > 0 ? 'block' : 'none';
-        document.getElementById('completed-projects-section').style.display = completedProjects.length > 0 ? 'block' : 'none';
+        // 4. 각 섹션의 표시 여부를 결정합니다.
+        activeProjectsSection.style.display = activeProjects.length > 0 ? 'block' : 'none';
+        scheduledProjectsSection.style.display = scheduledProjects.length > 0 ? 'block' : 'none';
+        completedProjectsSection.style.display = completedProjects.length > 0 ? 'block' : 'none';
     }
 
 
@@ -211,21 +220,34 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         };
 
+        // --- 버튼 상태 관리 ---
         const rightButtons = document.querySelector('.footer-buttons-right');
+        // 1. 삭제 확인 관련 버튼 초기화
         rightButtons.style.display = 'flex';
         confirmDeleteBtn.style.display = 'none';
         deleteProjectBtn.style.display = 'block';
 
-        if (project.status === 'completed') {
-            completeProjectBtn.style.display = 'none';
-            restoreProjectBtn.style.display = 'block';
-        } else {
-            completeProjectBtn.style.display = 'block';
-            restoreProjectBtn.style.display = 'none';
+        // 2. 모든 상태 변경 버튼을 일단 숨김
+        [completeProjectBtn, restoreProjectBtn, setStatusActiveBtn, setStatusScheduledBtn].forEach(btn => btn.style.display = 'none');
+
+        // 3. 프로젝트 상태에 따라 필요한 버튼만 표시
+        switch (project.status) {
+            case 'active': // "진행중"일 때
+                setStatusScheduledBtn.style.display = 'block'; // '예정으로 변경' 표시
+                completeProjectBtn.style.display = 'block';    // '프로젝트 종료' 표시
+                break;
+            case 'scheduled': // "예정"일 때
+                setStatusActiveBtn.style.display = 'block';     // '프로젝트 진행' 표시
+                break;
+            case 'completed': // "종료됨"일 때
+                restoreProjectBtn.style.display = 'block';      // '프로젝트 복구' 표시
+                break;
         }
 
+        // --- 데이터 렌더링 ---
         detailsModalTitle.textContent = project.name;
         detailsPrioritySelect.value = project.priority;
+        detailsCategorySelect.value = project.category;
         detailsDeadlineInput.value = formatDateToYYYYMMDD(project.deadline);
 
         detailsTaskList.innerHTML = '';
@@ -234,18 +256,18 @@ document.addEventListener('DOMContentLoaded', () => {
             taskEl.className = 'task-item-popup';
             const deadlineValue = task.deadline ? `value="${formatDateToYYYYMMDD(task.deadline)}"` : '';
             taskEl.innerHTML = `
-                <div class="task-item-header">
-                    <textarea class="task-content-input" data-task-id="${task.id}" rows="1">${task.content}</textarea>
-                    <button class="delete-task-btn" data-task-id="${task.id}">&times;</button>
+            <div class="task-item-header">
+                <textarea class="task-content-input" data-task-id="${task.id}" rows="1">${task.content}</textarea>
+                <button class="delete-task-btn" data-task-id="${task.id}">&times;</button>
+            </div>
+            <div class="task-item-footer">
+                <input type="date" class="deadline-input" ${deadlineValue} data-task-id="${task.id}">
+                <div class="task-progress-container">
+                    <input type="range" data-task-id="${task.id}" value="${task.progress}" min="0" max="100">
+                    <span>${task.progress}%</span>
                 </div>
-                <div class="task-item-footer">
-                    <input type="date" class="deadline-input" ${deadlineValue} data-task-id="${task.id}">
-                    <div class="task-progress-container">
-                        <input type="range" data-task-id="${task.id}" value="${task.progress}" min="0" max="100">
-                        <span>${task.progress}%</span>
-                    </div>
-                </div>
-            `;
+            </div>
+        `;
             detailsTaskList.appendChild(taskEl);
             const textarea = taskEl.querySelector('textarea');
             textarea.addEventListener('input', autoResizeTextarea);
@@ -258,15 +280,15 @@ document.addEventListener('DOMContentLoaded', () => {
             commentEl.className = 'comment-item';
             commentEl.dataset.commentId = comment.id;
             commentEl.innerHTML = `
-                <div class="comment-text-content">
-                    <span class="author">${comment.author_name}:</span>
-                    <span>${comment.content}</span>
-                </div>
-                <div class="comment-actions">
-                    <button class="edit-comment-btn">수정</button>
-                    <button class="delete-comment-btn">삭제</button>
-                </div>
-            `;
+            <div class="comment-text-content">
+                <span class="author">${comment.author_name}:</span>
+                <span>${comment.content}</span>
+            </div>
+            <div class="comment-actions">
+                <button class="edit-comment-btn">수정</button>
+                <button class="delete-comment-btn">삭제</button>
+            </div>
+        `;
             commentsList.appendChild(commentEl);
         });
 
@@ -341,32 +363,54 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- 4. 이벤트 리스너 설정 ---
     function setupEventListeners() {
+        // 사용자 UI
         currentUserIcon.addEventListener('click', (e) => { e.stopPropagation(); const isHidden = userPopup.style.display === 'none' || userPopup.style.display === ''; if (isHidden) { renderUserPopup(); userPopup.style.display = 'block'; } else { userPopup.style.display = 'none'; } });
         document.addEventListener('click', (e) => { if (!userPopup.contains(e.target) && !currentUserIcon.contains(e.target)) { userPopup.style.display = 'none'; } });
         userPopupList.addEventListener('click', (e) => { if (e.target.classList.contains('delete-user-btn')) { handleUserDelete(e.target.dataset.userId); } else { const userLi = e.target.closest('li'); if (userLi) handleUserSwitch(userLi.dataset.userId); } });
         addUserBtn.addEventListener('click', handleUserAdd);
+
+        // 프로젝트 리스트 클릭
         projectListEl.addEventListener('click', openDetailsModal);
         completedProjectListEl.addEventListener('click', openDetailsModal);
+        scheduledProjectListEl.addEventListener('click', openDetailsModal);
+
+        // 상세 모달 이벤트
         closeDetailsModalBtn.addEventListener('click', () => detailsModal.close());
-        completeProjectBtn.addEventListener('click', handleCompleteProject);
-        restoreProjectBtn.addEventListener('click', handleRestoreProject);
+        completeProjectBtn.addEventListener('click', () => handleSetStatus('completed'));
+        restoreProjectBtn.addEventListener('click', () => handleSetStatus('active'));
+        setStatusActiveBtn.addEventListener('click', () => handleSetStatus('active'));
+        setStatusScheduledBtn.addEventListener('click', () => handleSetStatus('scheduled'));
         deleteProjectBtn.addEventListener('click', enterDeleteConfirmationMode);
         confirmDeleteBtn.addEventListener('click', handleConfirmProjectDelete);
         detailsPrioritySelect.addEventListener('change', handlePriorityChange);
+        detailsCategorySelect.addEventListener('change', handleCategoryChange);
         detailsDeadlineInput.addEventListener('change', handleDeadlineChange);
         detailsTaskList.addEventListener('change', (e) => { if (e.target.type === 'range') updateProgress('task', e.target.dataset.taskId, e.target.value); if (e.target.classList.contains('deadline-input')) handleTaskDeadlineEdit(e.target.dataset.taskId, e.target.value); });
         detailsTaskList.addEventListener('focusout', (e) => { if (e.target.classList.contains('task-content-input')) handleTaskContentEdit(e.target.dataset.taskId, e.target.value); });
+        detailsTaskList.addEventListener('keydown', (e) => {
+            // 입력된 키가 Enter이고, Shift 키가 눌리지 않았을 때
+            if (e.target.classList.contains('task-content-input') && e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault(); // Enter 키의 기본 동작(줄바꿈)을 막음
+                e.target.blur();    // 입력창의 focus를 잃게 만들어, 기존의 focusout 저장 로직을 실행시킴
+            }
+        });
         detailsTaskList.addEventListener('click', (e) => { if (e.target.classList.contains('delete-task-btn')) { handleTaskDelete(e.target.dataset.taskId); } });
         addCommentBtn.addEventListener('click', handleAddComment);
         commentsList.addEventListener('click', (e) => { if (e.target.classList.contains('delete-comment-btn')) { handleCommentDelete(e.target.dataset.commentId); } if (e.target.classList.contains('edit-comment-btn')) { const commentItem = e.target.closest('.comment-item'); const currentContent = commentItem.querySelector('.comment-text-content span:last-child').textContent; const newContent = prompt('코멘트를 수정하세요:', currentContent); if (newContent && newContent.trim() !== currentContent) { handleCommentEdit(commentItem.dataset.commentId, newContent.trim()); } } });
         detailsModalTitle.addEventListener('click', handleTitleEdit);
         addDetailTaskBtn.addEventListener('click', handleAddNewTaskInDetail);
+
+        // 수동 진행도 슬라이더 이벤트
         projectListEl.addEventListener('change', (e) => { if (e.target.classList.contains('manual-progress-slider')) { updateProgress('project', e.target.dataset.projectId, e.target.value); } });
+
+        // 프로젝트 추가 모달
         addProjectBtn.addEventListener('click', openProjectModal);
         closeModalBtn.addEventListener('click', () => projectModal.close());
         addTaskFieldBtn.addEventListener('click', addModalTaskField);
         modalTaskListEl.addEventListener('click', (e) => { if (e.target.classList.contains('delete-task-btn')) e.target.parentElement.remove(); });
         projectForm.addEventListener('submit', handleFormSubmit);
+
+        // 게시판
         boardToggleBtn.addEventListener('click', toggleSidebar);
         closeSidebarBtn.addEventListener('click', toggleSidebar);
         sidebarBackdrop.addEventListener('click', toggleSidebar);
@@ -378,9 +422,20 @@ document.addEventListener('DOMContentLoaded', () => {
         editPostBtn.addEventListener('click', handleEditPostBtnClick);
         deletePostBtn.addEventListener('click', handleDeletePost);
         categoryFiltersEl.addEventListener('click', handleCategoryFilterClick);
-        [projectModal, detailsModal, postModal, postViewModal].forEach(modal => { modal.addEventListener('click', (e) => { if (e.target === modal) modal.close(); }); });
-    }
 
+        // '새 프로젝트' 팝업 상태 라디오 버튼
+        projectModal.querySelectorAll('input[name="status"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                const deadlineInput = document.getElementById('project-deadline');
+                deadlineInput.required = e.target.value === 'active';
+            });
+        });
+
+        // 팝업 외부 클릭 시 닫기
+        [projectModal, detailsModal, postModal, postViewModal].forEach(modal => {
+            modal.addEventListener('click', (e) => { if (e.target === modal) modal.close(); });
+        });
+    }
 
     // --- 5. 이벤트 핸들러 & 로직 ---
     function openDetailsModal(e) {
@@ -391,7 +446,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderDetailsModal();
             detailsModal.showModal();
             setTimeout(() => {
-                projectCalendar.render();
+                if (projectCalendar) projectCalendar.render();
                 document.querySelectorAll('#details-task-list .task-content-input').forEach(textarea => autoResizeTextarea({ target: textarea }));
             }, 0);
         }
@@ -404,20 +459,6 @@ document.addEventListener('DOMContentLoaded', () => {
         renderCurrentUserIcon();
         renderProjects();
     }
-
-    function handleCategoryFilterClick(e) {
-        if (e.target.tagName !== 'BUTTON') return;
-        
-        currentCategoryFilter = e.target.dataset.category;
-        
-        // 버튼 활성화 스타일 변경
-        categoryFiltersEl.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
-        e.target.classList.add('active');
-        
-        renderProjects();
-    }
-
-    
 
     async function handleUserAdd() {
         const name = newUserNameInput.value.trim();
@@ -463,6 +504,24 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // main.js의 이벤트 핸들러 영역에 아래 함수를 추가하세요.
+
+    function handleCategoryFilterClick(e) {
+        // 클릭된 요소가 버튼이 아니면 무시
+        if (e.target.tagName !== 'BUTTON') return;
+
+        // 현재 선택된 카테고리 상태를 업데이트
+        currentCategoryFilter = e.target.dataset.category;
+
+        // 모든 버튼에서 'active' 클래스를 제거
+        categoryFiltersEl.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+        // 클릭된 버튼에만 'active' 클래스 추가
+        e.target.classList.add('active');
+
+        // 새로운 필터에 맞춰 프로젝트 리스트를 다시 렌더링
+        renderProjects();
+    }
+
     async function handleAddComment() {
         const text = commentInput.value.trim();
         if (!text || !currentOpenProjectId) return;
@@ -481,17 +540,19 @@ document.addEventListener('DOMContentLoaded', () => {
             renderDetailsModal();
         } catch (error) {
             alert('코멘트 추가에 실패했습니다.');
-            commentInput.value = text; // 롤백
+            commentInput.value = text;
         }
     }
 
     async function handleTaskDelete(taskId) {
         if (!confirm('이 업무를 삭제하시겠습니까?')) return;
+
         const project = appData.projects.find(p => p.tasks.some(t => t.id == taskId));
         if (!project) return;
         const originalTasks = [...project.tasks];
         project.tasks = project.tasks.filter(t => t.id != taskId);
         renderDetailsModal();
+
         try {
             const response = await fetch(`/api/task/${taskId}`, { method: 'DELETE' });
             if (!response.ok) throw new Error('Server error');
@@ -521,42 +582,47 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function handleCompleteProject() {
-        if (!confirm('이 프로젝트를 종료 처리하시겠습니까?')) return;
+    async function handleSetStatus(newStatus) {
+        const statusMap = { active: '진행', scheduled: '예정', completed: '종료' };
+        if (!confirm(`이 프로젝트를 '${statusMap[newStatus]}' 상태로 변경하시겠습니까?`)) return;
+
         const project = appData.projects.find(p => p.id === currentOpenProjectId);
         if (!project) return;
 
         const originalStatus = project.status;
-        project.status = 'completed';
+        project.status = newStatus;
         renderAll();
         detailsModal.close();
 
         try {
-            const response = await fetch(`/api/project/${currentOpenProjectId}/status`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'completed' }) });
+            const response = await fetch(`/api/project/${currentOpenProjectId}/status`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: newStatus }) });
             if (!response.ok) throw new Error('Server error');
         } catch (error) {
-            alert("프로젝트 종료 처리에 실패했습니다.");
+            alert(`프로젝트 상태 변경에 실패했습니다.`);
             project.status = originalStatus;
             renderAll();
         }
     }
 
-    async function handleRestoreProject() {
-        if (!confirm('이 프로젝트를 다시 활성화하시겠습니까?')) return;
+    async function handleCategoryChange(e) {
+        const newCategory = e.target.value;
         const project = appData.projects.find(p => p.id === currentOpenProjectId);
-        if (!project) return;
+        if (!project || project.category === newCategory) return;
 
-        const originalStatus = project.status;
-        project.status = 'active';
-        renderAll();
-        detailsModal.close();
+        const originalCategory = project.category;
+        project.category = newCategory;
+        renderAll(); // 화면에 즉시 반영
 
         try {
-            const response = await fetch(`/api/project/${currentOpenProjectId}/status`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'active' }) });
+            const response = await fetch(`/api/project/${currentOpenProjectId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ category: newCategory })
+            });
             if (!response.ok) throw new Error('Server error');
         } catch (error) {
-            alert("프로젝트 되살리기에 실패했습니다.");
-            project.status = originalStatus;
+            alert('카테고리 변경에 실패했습니다.');
+            project.category = originalCategory; // 오류 시 원래대로 롤백
             renderAll();
         }
     }
@@ -574,8 +640,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!project) return;
 
         const projectIndex = appData.projects.findIndex(p => p.id === currentOpenProjectId);
-        if (projectIndex === -1) return;
-
         const originalProjects = [...appData.projects];
         appData.projects.splice(projectIndex, 1);
         renderAll();
@@ -593,74 +657,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function handleFormSubmit(e) {
-    // 1. form 태그의 기본 동작(페이지 새로고침)을 막습니다.
-    e.preventDefault();
-
-    // 2. 사용자가 입력한 세부 업무들을 수집합니다.
-    const tasks = [];
-    document.querySelectorAll('#modal-task-list > div').forEach(field => {
-        const content = field.querySelector('.task-content-input').value.trim();
-        // 내용이 비어있지 않은 업무만 tasks 배열에 추가합니다.
-        if (content) {
-            tasks.push({
-                content: content,
-                deadline: field.querySelector('.modal-task-deadline').value || null
-            });
-        }
-    });
-
-    // 3. '예정'과 '진행' 중 선택된 프로젝트 상태 값을 가져옵니다.
-    const status = projectForm.querySelector('input[name="status"]:checked').value;
-    const deadline = document.getElementById('project-deadline').value;
-
-    // 4. 만약 '진행' 상태를 선택했는데 마감일을 입력하지 않았다면, 경고하고 함수를 중단합니다.
-    if (status === 'active' && !deadline) {
-        alert('진행중인 프로젝트는 마감일이 필수입니다.');
-        return;
-    }
-
-    // 5. 서버로 전송할 프로젝트 전체 데이터를 하나의 객체로 만듭니다.
-    const newProjectData = {
-        name: document.getElementById('project-name-input').value,
-        user_id: parseInt(document.getElementById('project-user-select').value),
-        priority: parseInt(document.getElementById('project-priority-select').value),
-        category: document.getElementById('project-category-select').value,
-        status: status,
-        start_date: document.getElementById('project-start-date').value,
-        deadline: deadline || null,
-        tasks: tasks
-    };
-    
-    // 6. 서버와 통신하여 프로젝트를 생성하고, 오류 발생 시 처리합니다.
-    try {
-        // 서버의 '/api/project' 주소로 POST 요청을 보냅니다.
-        const response = await fetch('/api/project', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(newProjectData)
+        e.preventDefault();
+        const tasks = [];
+        document.querySelectorAll('#modal-task-list > div').forEach(field => {
+            const content = field.querySelector('.task-content-input').value.trim();
+            if (content) {
+                tasks.push({ content, deadline: field.querySelector('.modal-task-deadline').value || null });
+            }
         });
+        const newProjectData = { name: document.getElementById('project-name-input').value, user_id: parseInt(document.getElementById('project-user-select').value), priority: parseInt(document.getElementById('project-priority-select').value), status: projectForm.querySelector('input[name="status"]:checked').value, category: document.getElementById('project-category-select').value, start_date: document.getElementById('project-start-date').value, deadline: document.getElementById('project-deadline').value || null, tasks };
 
-        // 서버가 에러를 반환하면 예외를 발생시켜 catch 블록으로 보냅니다.
-        if (!response.ok) throw new Error('Server error');
-
-        // 서버로부터 방금 생성된 완전한 프로젝트 데이터를 응답으로 받습니다.
-        const newProject = await response.json();
-        
-        // 7. 로컬 데이터(appData)에 새 프로젝트를 추가합니다.
-        appData.projects.push(newProject);
-        
-        // 8. 변경된 최신 데이터로 화면 전체를 다시 그립니다.
-        renderAll();
-        
-        // 9. 프로젝트 생성 팝업을 닫습니다.
-        projectModal.close();
-
-    } catch (error) {
-        // API 요청 실패 시 사용자에게 알립니다.
-        console.error("프로젝트 생성 실패:", error);
-        alert('프로젝트 생성에 실패했습니다.');
+        try {
+            const response = await fetch('/api/project', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newProjectData) });
+            if (!response.ok) throw new Error('Server error');
+            const newProject = await response.json();
+            appData.projects.push(newProject);
+            renderAll();
+            projectModal.close();
+        } catch (error) {
+            alert('프로젝트 생성에 실패했습니다.');
+        }
     }
-}
+
     async function handlePriorityChange(e) {
         const newPriority = parseInt(e.target.value);
         const project = appData.projects.find(p => p.id === currentOpenProjectId);

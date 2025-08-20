@@ -218,12 +218,10 @@ def delete_user(user_id):
 @app.route('/api/project', methods=['POST'])
 def create_project():
     data = request.get_json() or {}
-    # [수정] category, status 필드 추가
     required = ['name', 'user_id', 'start_date', 'priority', 'category', 'status']
     if any(k not in data for k in required):
         return jsonify({'status': 'error', 'message': '필수 정보가 누락되었습니다.'}), 400
     
-    # [수정] '진행중' 상태일 때만 마감일이 필수
     if data['status'] == 'active' and not data.get('deadline'):
         return jsonify({'status': 'error', 'message': '진행중인 프로젝트는 마감일이 필수입니다.'}), 400
 
@@ -241,11 +239,17 @@ def create_project():
                 if rows:
                     psycopg2.extras.execute_batch(cur, "INSERT INTO Tasks (project_id, content, deadline) VALUES (%s,%s,%s)", rows)
             
+            # [핵심 수정] 최종적으로 완전한 프로젝트 정보를 다시 조회
             cur.execute("SELECT * FROM Projects WHERE id = %s", (project_id,))
             new_project = cur.fetchone()
-            new_project['tasks'] = []
-            new_project['comments'] = []
-        return jsonify(new_project), 201
+            
+            cur.execute("SELECT * FROM Tasks WHERE project_id = %s ORDER BY id ASC", (project_id,))
+            new_tasks = cur.fetchall()
+            
+            new_project['tasks'] = new_tasks
+            new_project['comments'] = [] # 새 프로젝트이므로 코멘트는 비어있음
+            
+            return jsonify(new_project), 201
     finally:
         conn.close()
 
