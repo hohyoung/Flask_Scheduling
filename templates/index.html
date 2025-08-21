@@ -1,18 +1,24 @@
 <!DOCTYPE html>
 <html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DI SCHEDULING</title>
-    
-    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
-    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
 
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DI SCHEDULING</title>
+
+    <!-- Libraries -->
+    <script defer src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+
+    <!-- Fonts -->
+    <link rel="stylesheet" as="style" crossorigin
+        href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+
+    <!-- App CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body>
 
+<body>
     <div id="loading-overlay" class="loading-overlay">
         <div class="spinner"></div>
     </div>
@@ -20,29 +26,36 @@
     <div class="container">
         <header>
             <div class="header-left">
-                <button id="board-toggle-btn" title="공유 게시판 열기">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M20 22H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1zm-1-2V4H5v16h14zM7 6h4v4H7V6zm0 6h10v2H7v-2zm0 4h10v2H7v-2zm6-8h4v4h-4V6z"></path></svg>
+                <button id="board-toggle-btn" title="공유 게시판 열기" aria-label="공유 게시판 열기">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                        <path
+                            d="M20 22H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1zm-1-2V4H5v16h14zM7 6h4v4H7V6zm0 6h10v2H7v-2zm0 4h10v2H7v-2zm6-8h4v4h-4V6z">
+                        </path>
+                    </svg>
                 </button>
                 <h1>DI SCHEDULING</h1>
             </div>
+
             <div class="user-profile-area">
-                <div id="current-user-icon" class="current-user-icon"></div>
+                <div id="current-user-icon" class="current-user-icon" aria-label="현재 사용자"></div>
                 <div id="user-popup" class="user-popup">
                     <ul id="user-popup-list" class="user-popup-list"></ul>
                     <div class="user-add-form">
-                        <input type="text" id="new-user-name" placeholder="새 팀원 이름">
-                        <button id="add-user-btn">추가</button>
+                        <button id="add-user-btn" class="add-user-btn-full">새 팀원 추가</button>
                     </div>
                 </div>
             </div>
         </header>
 
         <section class="controls">
-            <button id="add-project-btn">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20px" height="20px"><path d="M11 11V5h2v6h6v2h-6v6h-2v-6H5v-2h6z"></path></svg>
+            <button id="add-project-btn" aria-label="새 프로젝트 생성">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                    <path d="M11 11V5h2v6h6v2h-6v6h-2v-6H5v-2h6z"></path>
+                </svg>
                 <span>새 프로젝트</span>
             </button>
-            <div id="category-filters" class="category-filters">
+
+            <div id="category-filters" class="category-filters" role="group" aria-label="카테고리 필터">
                 <button class="filter-btn active" data-category="전체">전체</button>
                 <button class="filter-btn" data-category="문서">문서</button>
                 <button class="filter-btn" data-category="개발">개발</button>
@@ -56,25 +69,30 @@
                     <h2>진행중인 프로젝트</h2>
                     <main id="project-list" class="project-list"></main>
                 </section>
+
                 <section id="scheduled-projects-section" class="project-section">
                     <h2>프로젝트 예정</h2>
                     <div id="scheduled-project-list" class="project-list"></div>
                 </section>
+
                 <section id="completed-projects-section" class="project-section">
                     <h2>종료된 프로젝트</h2>
                     <div id="completed-project-list" class="project-list"></div>
                 </section>
             </div>
+
             <section id="calendar-container">
                 <div id="calendar"></div>
+                <div id="calendar-filters" class="calendar-filters"></div>
             </section>
         </div>
     </div>
 
-    <aside id="board-sidebar">
+    <!-- Board Sidebar -->
+    <aside id="board-sidebar" aria-hidden="true">
         <div class="sidebar-header">
             <h2>공유 게시판</h2>
-            <button id="close-sidebar-btn">&times;</button>
+            <button id="close-sidebar-btn" aria-label="게시판 닫기">&times;</button>
         </div>
         <div id="post-list" class="sidebar-content"></div>
         <div class="sidebar-footer">
@@ -83,11 +101,12 @@
     </aside>
     <div id="sidebar-backdrop"></div>
 
+    <!-- Post Create/Edit Modal -->
     <dialog id="post-modal">
         <form id="post-form">
             <h3 id="post-modal-title">새 글 작성</h3>
-            <input type="hidden" id="post-id-input">
-            <input type="text" id="post-title-input" placeholder="제목을 입력하세요" required>
+            <input type="hidden" id="post-id-input" />
+            <input type="text" id="post-title-input" placeholder="제목을 입력하세요" required />
             <textarea id="post-content-textarea" placeholder="내용을 입력하세요" required></textarea>
             <div class="form-buttons">
                 <button type="button" id="close-post-modal-btn" class="cancel-btn">취소</button>
@@ -96,6 +115,7 @@
         </form>
     </dialog>
 
+    <!-- Post View Modal -->
     <dialog id="post-view-modal">
         <div id="post-view-content">
             <h2 id="post-view-title"></h2>
@@ -109,12 +129,14 @@
         </div>
     </dialog>
 
+    <!-- Project Create Modal -->
     <dialog id="project-modal">
         <form id="project-form">
-             <h3>새 프로젝트 생성</h3>
-             <input type="text" id="project-name-input" placeholder="프로젝트 이름" required>
-             <select id="project-user-select" required></select>
-             <div class="form-row">
+            <h3>새 프로젝트 생성</h3>
+            <input type="text" id="project-name-input" placeholder="프로젝트 이름" required />
+            <select id="project-user-select" required></select>
+
+            <div class="form-row">
                 <select id="project-category-select">
                     <option value="문서">문서</option>
                     <option value="개발">개발</option>
@@ -126,36 +148,41 @@
                     <option value="2">보통</option>
                     <option value="3">낮음</option>
                 </select>
-             </div>
-             <div class="status-radios">
+            </div>
+
+            <div class="status-radios">
                 <label class="custom-radio">
-                    <input type="radio" name="status" value="scheduled" checked>
+                    <input type="radio" name="status" value="scheduled" checked />
                     <span>예정</span>
                 </label>
                 <label class="custom-radio">
-                    <input type="radio" name="status" value="active">
+                    <input type="radio" name="status" value="active" />
                     <span>진행</span>
                 </label>
-             </div>
-             <div class="form-row">
-                <input type="date" id="project-start-date" required title="시작일">
-                <input type="date" id="project-deadline" title="마감일">
-             </div>
-             <div id="modal-task-list"></div>
-             <button type="button" id="add-task-field-btn">세부 업무 추가</button>
-             <div class="form-buttons">
-                 <button type="button" id="close-modal-btn" class="cancel-btn">취소</button>
-                 <button type="submit">생성</button>
-             </div>
+            </div>
+
+            <div class="form-row">
+                <input type="date" id="project-start-date" required title="시작일" />
+                <input type="date" id="project-deadline" title="마감일" />
+            </div>
+
+            <div id="modal-task-list"></div>
+            <button type="button" id="add-task-field-btn">세부 업무 추가</button>
+
+            <div class="form-buttons">
+                <button type="button" id="close-modal-btn" class="cancel-btn">취소</button>
+                <button type="submit">생성</button>
+            </div>
         </form>
     </dialog>
 
+    <!-- Project Details Modal -->
     <dialog id="details-modal">
         <div class="details-modal-content">
             <div class="details-modal-left">
                 <div class="details-header">
                     <h3 id="details-modal-title"></h3>
-                    <input type="text" id="title-edit-input" class="title-edit-input" style="display: none;">
+                    <input type="text" id="title-edit-input" class="title-edit-input" style="display:none;" />
                     <div class="details-controls">
                         <select id="details-user-select"></select>
                         <select id="details-category-select">
@@ -163,7 +190,26 @@
                             <option value="개발">개발</option>
                             <option value="기타">기타</option>
                         </select>
-                        <input type="date" id="details-deadline-input">
+
+                        <!-- 기간 버튼 -->
+                        <button type="button" id="period-toggle" class="period-btn select-like">기간 선택</button>
+
+                        <!-- 기간 팝오버: 버튼을 눌렀을 때만 보이도록 -->
+                        <div id="period-popover" class="period-popover" hidden>
+                            <div class="dual-calendar-container">
+                                <div id="start-date-calendar-container">
+                                    <p>시작일</p>
+                                    <div id="start-date-calendar"></div>
+                                </div>
+                                <div id="deadline-calendar-container">
+                                    <p>마감일</p>
+                                    <div id="deadline-calendar"></div>
+                                </div>
+                            </div>
+                            <div class="period-actions">
+                                <button type="button" id="period-close-btn">확인</button>
+                            </div>
+                        </div>
                         <select id="details-priority-select">
                             <option value="1">우선순위: 높음</option>
                             <option value="2">우선순위: 보통</option>
@@ -171,14 +217,20 @@
                         </select>
                     </div>
                 </div>
+
                 <h4>
                     <span>세부 업무</span>
-                    <button id="add-detail-task-btn">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M11 11V5h2v6h6v2h-6v6h-2v-6H5v-2h6z"></path></svg>
+                    <button id="add-detail-task-btn" aria-label="업무 추가">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                            fill="currentColor">
+                            <path d="M11 11V5h2v6h6v2h-6v6h-2v-6H5v-2h6z"></path>
+                        </svg>
                         <span>업무 추가</span>
                     </button>
                 </h4>
+
                 <div id="details-task-list" class="task-list-popup"></div>
+
                 <div class="comments-section">
                     <h4>코멘트</h4>
                     <div id="comments-list"></div>
@@ -188,10 +240,12 @@
                     </div>
                 </div>
             </div>
+
             <div class="details-modal-right">
                 <div id="project-calendar"></div>
             </div>
         </div>
+
         <div id="details-modal-footer">
             <button type="button" id="close-details-modal-btn">닫기</button>
             <div class="footer-buttons-right">
@@ -201,10 +255,14 @@
                 <button type="button" id="complete-project-btn">프로젝트 종료</button>
                 <button type="button" id="delete-project-btn">프로젝트 삭제</button>
             </div>
-            <button type="button" id="confirm-delete-btn" style="display: none;">삭제 최종 확인</button>
+            <button type="button" id="confirm-delete-btn" style="display:none;">삭제 최종 확인</button>
         </div>
     </dialog>
+
     <div id="toast-container" class="toast-container"></div>
+
+    <!-- App JS -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
+
 </html>

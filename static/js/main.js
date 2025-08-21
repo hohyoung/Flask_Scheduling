@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
 
     // --- 1. 전역 변수 및 DOM 요소 ---
-    let appData = { users: [], projects: [], posts: [] };
+    let appData = { users: [], projects: [], posts: [], schedules: [] }; // schedules 추가
     let currentUser = null;
     let calendar = null;
     let projectCalendar = null;
@@ -9,6 +9,15 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentOpenPostId = null;
     let currentCategoryFilter = '전체';
     let sortable_tasks = null;
+    let startDateCalendar = null; // <<-- 추가
+    let deadlineCalendar = null;  // <<-- 추가
+    let calendarFilters = {
+        showDITeam: true,
+        showProjects: true,
+        showTasks: true,
+        showSchedules: true,
+        selectedUsers: new Set() // Set을 사용해 사용자 ID를 효율적으로 관리
+    };
 
     const projectListEl = document.getElementById('project-list');
     const completedProjectListEl = document.getElementById('completed-project-list');
@@ -31,7 +40,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const detailsModal = document.getElementById('details-modal');
     const detailsModalTitle = document.getElementById('details-modal-title');
     const detailsPrioritySelect = document.getElementById('details-priority-select');
-    const detailsDeadlineInput = document.getElementById('details-deadline-input');
     const detailsCategorySelect = document.getElementById('details-category-select');
     const detailsTaskList = document.getElementById('details-task-list');
     const projectCalendarEl = document.getElementById('project-calendar');
@@ -75,6 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const savedUserId = localStorage.getItem('currentSchedulerUser');
         setupEventListeners();
         await refreshDataAndRender(savedUserId);
+
     }
 
     async function refreshDataAndRender(savedUserId = null) {
@@ -85,7 +94,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             const response = await fetch('/api/data', { headers });
             if (!response.ok) throw new Error(`API 요청 실패: ${response.status}`);
+
             appData = await response.json();
+            // ⬇ 날짜/배열 정규화 (빈 문자열 -> null, tasks 보정)
+            appData.projects = (appData.projects || []).map(p => ({
+                ...p,
+                start_date: p.start_date || null,
+                deadline: p.deadline || null,
+                tasks: (p.tasks || []).map(t => ({ ...t, deadline: t.deadline || null }))
+            }));
 
             if (savedUserId && appData.users.some(u => u.id == savedUserId)) {
                 currentUser = appData.users.find(u => u.id == savedUserId);
@@ -96,12 +113,13 @@ document.addEventListener('DOMContentLoaded', () => {
             renderAll();
         } catch (error) { console.error('데이터 갱신 실패:', error); }
     }
-
     function renderAll() {
         renderCurrentUserIcon();
         renderProjects();
         initializeCalendar();
         renderSidebar();
+        renderCalendarFilters();
+
 
         if (appData.has_new_posts) {
             boardToggleBtn.classList.add('has-notification');
@@ -127,19 +145,27 @@ document.addEventListener('DOMContentLoaded', () => {
         appData.users.forEach(user => {
             const li = document.createElement('li');
             li.dataset.userId = user.id;
+
+            const isDITeam = user.name === 'DI 팀';
+            const positionText = user.position ? user.position : '직급 없음';
+
             li.innerHTML = `
-                <div class="user-info">
-                    <div class="small-icon" style="background-color:${getUserColor(user.id)}">${getShortName(user.name)}</div>
-                    <span>${user.name}</span>
-                </div>
-                <button class="delete-user-btn" data-user-id="${user.id}">×</button>
-            `;
+            <div class="user-info">
+                <div class="small-icon" style="background-color:${getUserColor(user.id)}">${getShortName(user.name)}</div>
+                <span>
+                    ${user.name}
+                    ${!isDITeam ? `<span class="user-position" style="color: #6c757d; font-size: 0.9em; cursor: pointer; margin-left: 5px;">${positionText}</span>` : ''}
+                </span>
+            </div>
+            ${!isDITeam ? `<button class="delete-user-btn" data-user-id="${user.id}">×</button>` : ''}
+        `;
             userPopupList.appendChild(li);
         });
     }
 
     function createProjectElement(project) {
-        const assignee = appData.users.find(u => u.id === project.user_id)?.name || '미지정';
+        const assignee = appData.users.find(u => u.id === project.user_id);
+        const assigneeText = assignee ? `${assignee.name} ${assignee.position || ''}`.trim() : '미지정';
         const projectEl = document.createElement('div');
         projectEl.className = 'project-item';
         projectEl.dataset.projectId = project.id;
@@ -178,8 +204,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 ${progressDisplayHTML}
                 <div class="project-footer">
-                    <p class="project-assignee">담당: ${assignee}</p>
-                    <span class="project-progress-text" style="color: ${projectColors.main};">${project.progress}%</span>
+                   <p class="project-assignee">담당: ${assigneeText}</p>
+                   <span class="project-progress-text" style="color: ${projectColors.main};">${project.progress}%</span>
                 </div>
             </div>
         `;
@@ -224,46 +250,86 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!project) {
             detailsModal.close();
             return;
-        };
+        }
 
-        // --- 버튼 상태 관리 ---
+        // --- 1) 우측 버튼 상태 초기화/표시 ---
         const rightButtons = document.querySelector('.footer-buttons-right');
-        // 1. 삭제 확인 관련 버튼 초기화
         rightButtons.style.display = 'flex';
         confirmDeleteBtn.style.display = 'none';
         deleteProjectBtn.style.display = 'block';
 
-        // 2. 모든 상태 변경 버튼을 일단 숨김
-        [completeProjectBtn, restoreProjectBtn, setStatusActiveBtn, setStatusScheduledBtn].forEach(btn => btn.style.display = 'none');
+        [completeProjectBtn, restoreProjectBtn, setStatusActiveBtn, setStatusScheduledBtn].forEach(btn => {
+            if (btn) btn.style.display = 'none';
+        });
 
-        // 3. 프로젝트 상태에 따라 필요한 버튼만 표시
         switch (project.status) {
-            case 'active': // "진행중"일 때
-                setStatusScheduledBtn.style.display = 'block'; // '예정으로 변경' 표시
-                completeProjectBtn.style.display = 'block';    // '프로젝트 종료' 표시
+            case 'scheduled':
+                setStatusActiveBtn.style.display = 'block';
                 break;
-            case 'scheduled': // "예정"일 때
-                setStatusActiveBtn.style.display = 'block';     // '프로젝트 진행' 표시
+            case 'active':
+                completeProjectBtn.style.display = 'block';
+                setStatusScheduledBtn.style.display = 'block';
                 break;
-            case 'completed': // "종료됨"일 때
-                restoreProjectBtn.style.display = 'block';      // '프로젝트 복구' 표시
+            case 'completed':
+                restoreProjectBtn.style.display = 'block';
                 break;
         }
 
-        // --- 데이터 렌더링 ---
+        // --- 2) 기본 정보 렌더링 ---
         detailsModalTitle.textContent = project.name;
         detailsPrioritySelect.value = project.priority;
         detailsCategorySelect.value = project.category;
-        // [신규] 담당자 선택 목록 렌더링
-        detailsUserSelect.innerHTML = appData.users.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
-        // 담당자가 없는 경우(NULL)를 대비하여 || '' 추가
+        detailsUserSelect.innerHTML = appData.users
+            .map(u => `<option value="${u.id}">${u.name}</option>`)
+            .join('');
         detailsUserSelect.value = project.user_id || '';
-        detailsDeadlineInput.value = formatDateToYYYYMMDD(project.deadline);
+        setPeriodLabel(project);
 
+        // --- 3) 기간(콤보 버튼 + 팝오버) ---
+
+        const periodBtn = document.getElementById('period-toggle');
+        const periodPopover = document.getElementById('period-popover');
+        const periodCloseBtn = document.getElementById('period-close-btn');
+
+
+        if (periodBtn && periodPopover && periodCloseBtn) {
+            
+
+            // 팝오버는 기본 닫힘
+            periodPopover.hidden = true;
+
+            // 열릴 때만 달력 생성/갱신
+            periodBtn.onclick = () => {
+                periodPopover.hidden = !periodPopover.hidden;
+                if (!periodPopover.hidden) renderPeriodCalendars(project);
+            };
+            periodCloseBtn.onclick = () => { periodPopover.hidden = true; };
+
+            // 바깥 클릭으로 닫기(중복 등록 방지)
+            if (detailsModal._periodOutsideClickHandler) {
+                document.removeEventListener('click', detailsModal._periodOutsideClickHandler, true);
+            }
+            detailsModal._periodOutsideClickHandler = (e) => {
+                if (!periodPopover.hidden && !periodPopover.contains(e.target) && e.target !== periodBtn) {
+                    periodPopover.hidden = true;
+                }
+            };
+            document.addEventListener('click', detailsModal._periodOutsideClickHandler, true);
+        }
+
+        
+
+        // --- 4) 세부 업무 리스트 렌더링 (마감 지난 업무 강조) ---
         detailsTaskList.innerHTML = '';
         project.tasks.forEach(task => {
             const taskEl = document.createElement('div');
-            taskEl.className = 'task-item-popup';
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const isOverdue = task.deadline && new Date(task.deadline) < today && task.progress < 100;
+
+            taskEl.className = `task-item-popup ${isOverdue ? 'task-item-overdue' : ''}`;
+
             const deadlineValue = task.deadline ? `value="${formatDateToYYYYMMDD(task.deadline)}"` : '';
             taskEl.innerHTML = `
             <div class="task-item-header">
@@ -279,11 +345,13 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
             detailsTaskList.appendChild(taskEl);
+
             const textarea = taskEl.querySelector('textarea');
             textarea.addEventListener('input', autoResizeTextarea);
             autoResizeTextarea({ target: textarea });
         });
 
+        // --- 5) 코멘트 렌더링 ---
         commentsList.innerHTML = '';
         project.comments.forEach(comment => {
             const commentEl = document.createElement('div');
@@ -302,18 +370,21 @@ document.addEventListener('DOMContentLoaded', () => {
             commentsList.appendChild(commentEl);
         });
 
-        if (sortable_tasks) sortable_tasks.destroy(); // 기존 인스턴스가 있으면 파괴
+        // --- 6) 세부업무 드래그 정렬 ---
+        if (sortable_tasks) sortable_tasks.destroy();
         sortable_tasks = new Sortable(detailsTaskList, {
             animation: 150,
             ghostClass: 'sortable-ghost',
             chosenClass: 'sortable-chosen',
-            onEnd: handleTaskReorder, // 드래그가 끝나면 실행될 함수
+            onEnd: handleTaskReorder,
             filter: 'input[type="range"]',
             preventOnFilter: false
         });
 
+        // --- 7) 우측 프로젝트 미니 캘린더 갱신 ---
         initializeProjectCalendar(project);
     }
+
 
     function renderSidebar() {
         postListEl.innerHTML = '';
@@ -334,33 +405,130 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function initializeCalendar() {
+    function renderPeriodCalendars(project) {
+        const startCalEl = document.getElementById('start-date-calendar');
+        const deadlineCalEl = document.getElementById('deadline-calendar');
+
+        if (startDateCalendar) startDateCalendar.destroy();
+        if (deadlineCalendar) deadlineCalendar.destroy();
+
+        const startInit =
+            toValidDateOrNull(project.start_date) ?? new Date();
+        startDateCalendar = new FullCalendar.Calendar(startCalEl, {
+            initialDate: startInit, initialView: 'dayGridMonth',
+            headerToolbar: { left: 'prev', center: 'title', right: 'next' },
+            locale: 'ko',
+            dayCellDidMount(arg) {
+                if (project.start_date && toValidDateOrNull(project.start_date)) {
+                    const sel = formatDateToYYYYMMDD(project.start_date);
+                    if (formatDateToYYYYMMDD(arg.date) === sel) arg.el.classList.add('selected-date');
+                }
+            },
+            dateClick(arg) { handleDateChange('start_date', arg.dateStr); setPeriodLabel(project); } // 기존 함수 재사용
+        });
+        startDateCalendar.render();
+
+        const deadlineInit =
+            toValidDateOrNull(project.deadline) ??
+            toValidDateOrNull(project.start_date) ??
+            new Date();
+        deadlineCalendar = new FullCalendar.Calendar(deadlineCalEl, {
+            initialDate: deadlineInit, initialView: 'dayGridMonth',
+            headerToolbar: { left: 'prev', center: 'title', right: 'next' },
+            locale: 'ko',
+            dayCellDidMount(arg) {
+                if (project.deadline && toValidDateOrNull(project.deadline)) {
+                    const sel = formatDateToYYYYMMDD(project.deadline);
+                    if (formatDateToYYYYMMDD(arg.date) === sel) arg.el.classList.add('selected-date');
+                }
+            },
+            dateClick(arg) { handleDateChange('deadline', arg.dateStr); setPeriodLabel(project); }  // 기존 함수 재사용
+        });
+        deadlineCalendar.render();
+    }
+
+
+
+
+
+    function generateCalendarEvents() {
         const events = [];
-        appData.projects.filter(p => p.status === 'active').forEach(project => {
-            const projectColors = getProjectColor(project.id);
-            const assignee = appData.users.find(u => u.id === project.user_id);
-            const assigneeName = assignee ? ` ${assignee.name}` : '';
-            if (project.deadline) {
+        const diTeamUser = appData.users.find(u => u.name === 'DI 팀');
+        const diTeamId = diTeamUser ? diTeamUser.id : -1;
+
+        // --- 1. 프로젝트 및 세부업무 렌더링 ---
+        appData.projects.forEach(project => {
+            const isDITeamProject = project.user_id === diTeamId;
+            const isUserSelected = calendarFilters.selectedUsers.has(project.user_id);
+
+            let shouldShowEventBase = false;
+            if (isDITeamProject) {
+                shouldShowEventBase = calendarFilters.showDITeam;
+            } else {
+                shouldShowEventBase = isUserSelected;
+            }
+
+            const shouldShowProject = calendarFilters.showProjects && shouldShowEventBase;
+            const shouldShowTasks = calendarFilters.showTasks && shouldShowEventBase;
+
+            if (shouldShowProject && project.deadline) {
+                const projectColors = getProjectColor(project.id);
+                const assignee = appData.users.find(u => u.id === project.user_id);
+                const assigneeName = assignee ? ` ${assignee.name}` : '';
                 events.push({
                     title: `[P${assigneeName}] ${project.name}`,
-                    start: formatDateToYYYYMMDD(project.start_date),
+                    start: formatDateToYYYYMMDD(project.start_date || project.deadline),
                     end: formatDateToYYYYMMDD(project.deadline),
                     backgroundColor: projectColors.main,
                     borderColor: projectColors.main
                 });
             }
-            project.tasks.forEach(task => {
-                if (task.deadline) {
-                    events.push({ title: `[업무] ${task.content}`, start: formatDateToYYYYMMDD(task.deadline), allDay: true, backgroundColor: '#6c757d' });
+
+            if (shouldShowTasks) {
+                project.tasks.forEach(task => {
+                    if (task.deadline) {
+                        events.push({ title: `[업무] ${task.content}`, start: formatDateToYYYYMMDD(task.deadline), allDay: true, backgroundColor: '#6c757d' });
+                    }
+                });
+            }
+        });
+
+        // --- 개인 일정(Schedules)을 캘린더에 추가하는 부분 ---
+        if (calendarFilters.showSchedules) {
+            (appData.schedules || []).forEach(schedule => {
+                if (calendarFilters.selectedUsers.has(schedule.user_id)) {
+                    events.push({
+                        id: `schedule-${schedule.id}`,
+                        title: `[S ${schedule.user_name}] ${schedule.content}`,
+                        start: formatDateToYYYYMMDD(schedule.schedule_date),
+                        allDay: true,
+                        backgroundColor: '#6f42c1',
+                        borderColor: '#6f42c1',
+                        extendedProps: {
+                            type: 'schedule',
+                            scheduleId: schedule.id
+                        }
+                    });
                 }
             });
-        });
+        }
+
+        return events;
+    }
+
+    // 기존 initializeCalendar 함수는 필터링된 이벤트를 받아 렌더링만 하도록 수정
+    function initializeCalendar() {
+        const filteredEvents = generateCalendarEvents();
+
         if (calendar) calendar.destroy();
         calendar = new FullCalendar.Calendar(calendarEl, {
             initialView: 'dayGridMonth',
             headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' },
-            events: events,
-            locale: 'ko'
+            events: filteredEvents, // 필터링된 이벤트를 사용
+            locale: 'ko',
+            height: '65vh',
+            dateClick: handleDateClick,   // <<-- 날짜 클릭 핸들러 추가
+            eventClick: handleEventClick  // <<-- 이벤트 클릭 핸들러 추가
         });
         calendar.render();
     }
@@ -368,8 +536,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function initializeProjectCalendar(project) {
         const events = [];
         project.tasks.forEach(task => {
-            if (task.deadline) {
-                events.push({ title: task.content, start: formatDateToYYYYMMDD(task.deadline), allDay: true, backgroundColor: getProjectColor(project.id).main });
+            const tDate = formatDateToYYYYMMDD(task.deadline); // ← 포맷해보고
+            if (tDate) {                                      // ← 유효할 때만 푸시
+                events.push({
+                    title: task.content,
+                    start: tDate,
+                    allDay: true,
+                    backgroundColor: getProjectColor(project.id).main
+                });
             }
         });
         if (projectCalendar) projectCalendar.destroy();
@@ -383,14 +557,52 @@ document.addEventListener('DOMContentLoaded', () => {
         projectCalendar.render();
     }
 
+    function renderCalendarFilters() {
+        const filtersEl = document.getElementById('calendar-filters');
+        if (!filtersEl) return;
+
+        const userFiltersHTML = appData.users
+            .filter(u => u.name !== 'DI 팀')
+            .map(user => `
+            <label>
+                <input type="checkbox" class="calendar-filter-user" value="${user.id}" ${calendarFilters.selectedUsers.has(user.id) ? 'checked' : ''}>
+                <span>${user.name}</span>
+            </label>
+        `).join('');
+
+        filtersEl.innerHTML = `
+        <div class="filter-group">
+            <label>
+                <input type="checkbox" class="calendar-filter-type" value="di-team" ${calendarFilters.showDITeam ? 'checked' : ''}>
+                <span><strong>DI팀</strong></span>
+            </label>
+        </div>
+        <div class="filter-group">
+            <label>
+                <input type="checkbox" class="calendar-filter-type" value="projects" ${calendarFilters.showProjects ? 'checked' : ''}>
+                <span>프로젝트</span>
+            </label>
+            <label>
+                <input type="checkbox" class="calendar-filter-type" value="tasks" ${calendarFilters.showTasks ? 'checked' : ''}>
+                <span>세부업무</span>
+            </label>
+            <label> 
+                <input type="checkbox" class="calendar-filter-type" value="schedules" ${calendarFilters.showSchedules ? 'checked' : ''}>
+                <span>개인일정</span>
+            </label>
+        </div>
+        <div class="filter-group user-filters">
+            ${userFiltersHTML}
+        </div>
+    `;
+    }
+
     // --- 4. 이벤트 리스너 설정 ---
     function setupEventListeners() {
         // 사용자 UI
         currentUserIcon.addEventListener('click', (e) => { e.stopPropagation(); const isHidden = userPopup.style.display === 'none' || userPopup.style.display === ''; if (isHidden) { renderUserPopup(); userPopup.style.display = 'block'; } else { userPopup.style.display = 'none'; } });
         document.addEventListener('click', (e) => { if (!userPopup.contains(e.target) && !currentUserIcon.contains(e.target)) { userPopup.style.display = 'none'; } });
-        userPopupList.addEventListener('click', (e) => { if (e.target.classList.contains('delete-user-btn')) { handleUserDelete(e.target.dataset.userId); } else { const userLi = e.target.closest('li'); if (userLi) handleUserSwitch(userLi.dataset.userId); } });
-        addUserBtn.addEventListener('click', handleUserAdd);
-
+        userPopupList.addEventListener('click', (e) => { if (e.target.classList.contains('delete-user-btn')) { handleUserDelete(e.target.dataset.userId); } else if (e.target.classList.contains('user-position')) { const userLi = e.target.closest('li'); handleUserPositionEdit(userLi.dataset.userId); } else { const userLi = e.target.closest('li'); if (userLi) handleUserSwitch(userLi.dataset.userId); } }); addUserBtn.addEventListener('click', handleUserAdd);
         // 프로젝트 리스트 클릭
         projectListEl.addEventListener('click', openDetailsModal);
         completedProjectListEl.addEventListener('click', openDetailsModal);
@@ -407,7 +619,6 @@ document.addEventListener('DOMContentLoaded', () => {
         detailsPrioritySelect.addEventListener('change', handlePriorityChange);
         detailsCategorySelect.addEventListener('change', handleCategoryChange);
         detailsUserSelect.addEventListener('change', handleAssigneeChange);
-        detailsDeadlineInput.addEventListener('change', handleDeadlineChange);
         detailsTaskList.addEventListener('change', (e) => { if (e.target.type === 'range') updateProgress('task', e.target.dataset.taskId, e.target.value); if (e.target.classList.contains('deadline-input')) handleTaskDeadlineEdit(e.target.dataset.taskId, e.target.value); });
         detailsTaskList.addEventListener('focusout', (e) => { if (e.target.classList.contains('task-content-input')) handleTaskContentEdit(e.target.dataset.taskId, e.target.value); });
         detailsTaskList.addEventListener('keydown', (e) => {
@@ -458,6 +669,34 @@ document.addEventListener('DOMContentLoaded', () => {
         [detailsModal, postModal, postViewModal].forEach(modal => {
             modal.addEventListener('click', (e) => { if (e.target === modal) modal.close(); });
         });
+
+        const filtersEl = document.getElementById('calendar-filters');
+        filtersEl.addEventListener('change', (e) => {
+            if (e.target.type !== 'checkbox') return;
+
+            if (e.target.classList.contains('calendar-filter-type')) {
+                const type = e.target.value;
+                if (type === 'di-team') calendarFilters.showDITeam = e.target.checked;
+                if (type === 'projects') calendarFilters.showProjects = e.target.checked;
+                if (type === 'tasks') calendarFilters.showTasks = e.target.checked;
+                if (type === 'schedules') calendarFilters.showSchedules = e.target.checked;
+
+            }
+
+            if (e.target.classList.contains('calendar-filter-user')) {
+                const userId = parseInt(e.target.value);
+                if (e.target.checked) {
+                    calendarFilters.selectedUsers.add(userId);
+                } else {
+                    calendarFilters.selectedUsers.delete(userId);
+                }
+            }
+
+            initializeCalendar(); // 필터 상태가 변경되었으므로 캘린더를 다시 그림
+        });
+
+
+
     }
 
     // --- 5. 이벤트 핸들러 & 로직 ---
@@ -507,79 +746,180 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function handleUserAdd() {
-        const name = newUserNameInput.value.trim();
-        if (!name) return;
+    async function handleDateChange(field, newDate) {
+        const project = appData.projects.find(p => p.id === currentOpenProjectId);
+        if (!project || project[field] === newDate) return;
+
+        // 시작일이 마감일보다 늦어지지 않도록 방어
+        if (field === 'start_date' && project.deadline && new Date(newDate) > new Date(project.deadline)) {
+            showToast('시작일은 마감일보다 늦을 수 없습니다.');
+            return;
+        }
+        if (field === 'deadline' && new Date(newDate) < new Date(project.start_date)) {
+            showToast('마감일은 시작일보다 빠를 수 없습니다.');
+            return;
+        }
+
+        const originalDate = project[field];
+        project[field] = newDate;
+
+        setPeriodLabel(project); 
+        renderDetailsModal(); // 캘린더 UI 즉시 업데이트
+        renderAll(); // 메인 화면에도 반영
+
         try {
-            const response = await fetch('/api/user', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+            const response = await fetch(`/api/project/${currentOpenProjectId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ [field]: newDate }) // 동적 필드 이름 사용
+            });
+            if (!response.ok) throw new Error('Server error');
+        } catch (error) {
+            showToast('날짜 변경에 실패했습니다.');
+            project[field] = originalDate; // 오류 시 롤백
+            renderDetailsModal();
+            renderAll();
+        }
+    }
+
+    async function handleUserAdd() {
+        const name = prompt("새 팀원의 이름을 입력하세요:");
+        if (!name || name.trim() === '') {
+            return; // 사용자가 취소하거나 아무것도 입력하지 않으면 중단
+        }
+
+        const position = prompt("새 팀원의 직급을 입력하세요 (선택사항):");
+        // 사용자가 직급 입력을 취소해도 이름은 추가되도록 null 처리
+        const positionValue = position ? position.trim() : null;
+
+        try {
+            const response = await fetch('/api/user', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name.trim(), position: positionValue })
+            });
             if (!response.ok) throw new Error('Server error');
             const newUser = await response.json();
             if (newUser) {
                 appData.users.push(newUser);
-                newUserNameInput.value = '';
-                renderUserPopup();
+                renderUserPopup(); // 새 사용자가 추가된 리스트를 바로 다시 그림
+                // 1. 새로 추가된 사용자를 캘린더 필터 선택 목록에 포함시킵니다.
+                calendarFilters.selectedUsers.add(newUser.id);
+                // 2. 변경된 목록으로 캘린더 필터 UI를 다시 그립니다.
+                renderCalendarFilters();
+                // 3. 캘린더를 새로고침합니다.
+                initializeCalendar();
             }
         } catch (error) {
             showToast('사용자 추가에 실패했습니다.');
         }
     }
 
-    async function refreshDataAndRender(savedUserId = null) {
-        const loadingOverlay = document.getElementById('loading-overlay'); // 로딩 요소 가져오기
+    async function handleUserPositionEdit(userId) {
+        const user = appData.users.find(u => u.id == userId);
+        if (!user || user.name === 'DI 팀') return; // "DI 팀"은 수정 불가
+
+        const newPosition = prompt('새 직급을 입력하세요:', user.position || '');
+
+        if (newPosition === null || newPosition.trim() === (user.position || '')) {
+            return;
+        }
+
+        const originalPosition = user.position;
+        user.position = newPosition.trim();
+        renderUserPopup(); // [핵심 수정] UI를 즉시 다시 그림
+        renderProjects();  // 프로젝트 카드의 담당자 정보도 업데이트
 
         try {
-            const headers = {};
-            if (currentUser) {
-                headers['X-Current-User-ID'] = currentUser.id;
-            }
-            const response = await fetch('/api/data', { headers });
-            if (!response.ok) throw new Error(`API 요청 실패: ${response.status}`);
-            appData = await response.json();
+            const response = await fetch(`/api/user/${userId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ position: newPosition.trim() })
+            });
+            if (!response.ok) throw new Error('Server error');
+
+            const updatedUser = await response.json();
+            user.position = updatedUser.position;
+            renderUserPopup(); // [핵심 수정] 서버 응답 후에도 다시 그림
+            renderProjects();
+
+        } catch (error) {
+            showToast('직급 수정에 실패했습니다.');
+            user.position = originalPosition;
+            renderUserPopup(); // [핵심 수정] 롤백 후에도 다시 그림
+            renderProjects();
+        }
+    }
+
+    async function refreshDataAndRender(savedUserId = null) {
+        try {
+            const headers = currentUser ? { 'X-Current-User-ID': currentUser.id } : {};
+            const resp = await fetch('/api/data', { headers });
+            if (!resp.ok) throw new Error(`API 요청 실패: ${resp.status}`);
+            appData = await resp.json();
+
+            // 날짜/배열 정규화 유지
+            appData.projects = (appData.projects || []).map(p => ({
+                ...p,
+                start_date: p.start_date || null,
+                deadline: p.deadline || null,
+                tasks: (p.tasks || []).map(t => ({ ...t, deadline: t.deadline || null }))
+            }));
+
+            // 캘린더 사용자 기본 선택
+            calendarFilters.selectedUsers = new Set(appData.users.map(u => u.id));
 
             if (savedUserId && appData.users.some(u => u.id == savedUserId)) {
                 currentUser = appData.users.find(u => u.id == savedUserId);
-            } else if ((!currentUser || !appData.users.some(u => u.id === currentUser.id)) && appData.users.length > 0) {
+            } else if ((!currentUser || !appData.users.some(u => u.id === currentUser.id)) && appData.users.length) {
                 currentUser = appData.users[0];
             }
-
             renderAll();
-        } catch (error) {
-            console.error('데이터 갱신 실패:', error);
-            // 여기에 에러 메시지를 사용자에게 보여주는 로직을 추가할 수도 있습니다.
+        } catch (e) {
+            console.error('데이터 갱신 실패:', e);
         } finally {
-
-            loadingOverlay.classList.add('hidden');
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) overlay.classList.add('hidden');
         }
     }
 
     async function handleUserDelete(userId) {
         if (!confirm('정말로 이 사용자를 삭제하시겠습니까?')) return;
-        const originalUsers = [...appData.users];
-        const userToDelete = appData.users.find(u => u.id == userId);
 
+        const originalUsers = [...appData.users];
+        const originalCurrentUser = currentUser;
+
+        // 1. 데이터 상태를 먼저 변경합니다.
         appData.users = appData.users.filter(u => u.id != userId);
-        renderUserPopup();
+        calendarFilters.selectedUsers.delete(parseInt(userId));
+
+        // 2. 만약 삭제된 유저가 현재 유저였다면, 첫 번째 유저로 변경합니다.
         if (currentUser?.id == userId) {
             currentUser = appData.users.length > 0 ? appData.users[0] : null;
-            if (currentUser) localStorage.setItem('currentSchedulerUser', currentUser.id);
-            else localStorage.removeItem('currentSchedulerUser');
-            renderAll();
+            if (currentUser) {
+                localStorage.setItem('currentSchedulerUser', currentUser.id);
+            } else {
+                localStorage.removeItem('currentSchedulerUser');
+            }
         }
+
+        // 3. 변경된 상태를 화면 전체에 일관되게 반영합니다.
+        renderAll();
+        renderUserPopup();
 
         try {
             const response = await fetch(`/api/user/${userId}`, { method: 'DELETE' });
             if (!response.ok) throw new Error('Server error');
+            showToast('사용자가 삭제되었습니다.'); // 성공 토스트 추가
         } catch (error) {
             showToast('사용자 삭제에 실패했습니다. 원래대로 복구합니다.');
+            // 롤백
             appData.users = originalUsers;
-            if (userToDelete && currentUser?.id != userToDelete.id) {
-                currentUser = appData.users.find(u => u.id === currentUser.id);
-            }
-            renderAll();
+            currentUser = originalCurrentUser;
+            renderUserPopup();
+            renderAll(); // UI도 전체 롤백
         }
     }
-
-    // main.js의 이벤트 핸들러 영역에 아래 함수를 추가하세요.
 
     function handleCategoryFilterClick(e) {
         // 클릭된 요소가 버튼이 아니면 무시
@@ -1152,14 +1492,77 @@ document.addEventListener('DOMContentLoaded', () => {
         textarea.addEventListener('input', autoResizeTextarea);
         modalTaskListEl.appendChild(taskField);
     }
+
+
+
+    // 날짜 클릭 시 실행될 함수 (신규)
+    function handleDateClick(arg) {
+        const content = prompt(`${arg.dateStr}에 추가할 일정을 입력하세요:`);
+        if (content && content.trim() !== '') {
+            createSchedule(content.trim(), arg.dateStr);
+        }
+    }
+
+    // 캘린더의 이벤트를 클릭했을 때 실행될 함수 (신규)
+    function handleEventClick(arg) {
+        // 개인 일정(schedule) 타입인 경우에만 삭제 로직 실행
+        if (arg.event.extendedProps.type === 'schedule') {
+            if (confirm(`'${arg.event.title}' 일정을 삭제하시겠습니까?`)) {
+                deleteSchedule(arg.event.extendedProps.scheduleId);
+            }
+        }
+    }
+
+    // 서버에 일정 생성을 요청하는 함수 (신규)
+    async function createSchedule(content, scheduleDate) {
+        try {
+            const response = await fetch('/api/schedule', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: currentUser.id,
+                    content: content,
+                    schedule_date: scheduleDate
+                })
+            });
+            if (!response.ok) throw new Error('Server error');
+            const newSchedule = await response.json();
+            appData.schedules.push(newSchedule); // 로컬 데이터에 추가
+            initializeCalendar(); // 캘린더 새로고침
+            showToast('새로운 일정이 추가되었습니다.');
+        } catch (error) {
+            showToast('일정 추가에 실패했습니다.');
+        }
+    }
+
+    // 서버에 일정 삭제를 요청하는 함수 (신규)
+    async function deleteSchedule(scheduleId) {
+        // 낙관적 UI 업데이트: 일단 화면에서 먼저 지움
+        const originalSchedules = [...appData.schedules];
+        appData.schedules = appData.schedules.filter(s => s.id !== scheduleId);
+        initializeCalendar();
+
+        try {
+            const response = await fetch(`/api/schedule/${scheduleId}`, { method: 'DELETE' });
+            if (!response.ok) throw new Error('Server error');
+            showToast('일정이 삭제되었습니다.');
+        } catch (error) {
+            showToast('일정 삭제에 실패했습니다. 원래대로 복구합니다.');
+            appData.schedules = originalSchedules; // 실패 시 롤백
+            initializeCalendar();
+        }
+    }
+
     // --- 6. 헬퍼 함수 ---
     function autoResizeTextarea(event) { const textarea = event.target; textarea.style.height = 'auto'; textarea.style.height = textarea.scrollHeight + 'px'; }
     function getShortName(name) { if (name === 'DI 팀') { return 'DI'; } if (name && name.length > 1) { return name.substring(1).trim().replace(/\s/g, ''); } return name; }
     function getUserColor(userId) { const colors = ['#6d6875', '#b5838d', '#e5989b', '#ffb4a2', '#ffcdb2']; return colors[((userId || 0) - 1 + colors.length) % colors.length]; }
     function getProjectColor(projectId) { const colors = [{ main: '#20c997', background: '#e9fbf5' }, { main: '#fd7e14', background: '#fff4e7' }, { main: '#6610f2', background: '#f0e7fd' }, { main: '#0d6efd', background: '#e7f0ff' }, { main: '#d63384', background: '#faeaf1' }, { main: '#198754', background: '#e8f3ee' }]; return colors[((projectId || 0) - 1 + colors.length) % colors.length]; }
     function calculateDday(deadline) { if (!deadline) return { text: '미정', isUrgent: false }; const today = new Date(); const deadlineDate = new Date(deadline); today.setHours(0, 0, 0, 0); deadlineDate.setHours(0, 0, 0, 0); const diffTime = deadlineDate - today; const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); if (diffDays === 0) { return { text: 'D-Day', isUrgent: true }; } else if (diffDays < 0) { return { text: `D+${Math.abs(diffDays)}`, isUrgent: false }; } else { return { text: `D-${diffDays}`, isUrgent: diffDays <= 7 }; } }
-    function formatDateToYYYYMMDD(dateString) { if (!dateString) return ''; const date = new Date(dateString); const year = date.getFullYear(); const month = String(date.getMonth() + 1).padStart(2, '0'); const day = String(date.getDate()).padStart(2, '0'); return `${year}-${month}-${day}`; }
-    function showToast(message) { const container = document.getElementById('toast-container'); if (!container) { console.error('Toast container not found!'); return; } const toast = document.createElement('div'); toast.className = 'toast-message'; toast.textContent = message; container.appendChild(toast); toast.addEventListener('animationend', () => { toast.remove(); }); }    // --- 앱 시작 ---
+    function formatDateToMMDD(input) { const d = toValidDateOrNull(input); if (!d) return ''; const mm = String(d.getMonth() + 1).padStart(2, '0'); const dd = String(d.getDate()).padStart(2, '0'); return `${mm}-${dd}`; }
+    function formatDateToYYYYMMDD(input) { if (!input) return ''; const d = (input instanceof Date) ? input : new Date(input); if (Number.isNaN(d.getTime())) return ''; const y = d.getFullYear(); const m = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); return `${y}-${m}-${day}`; }
     function updateProjectProgress(projectId) { const project = appData.projects.find(p => p.id === projectId); if (!project || project.tasks.length === 0) { if (project) project.progress = 0; return; } const totalProgress = project.tasks.reduce((sum, t) => sum + t.progress, 0); project.progress = Math.round(totalProgress / project.tasks.length); }
+    function toValidDateOrNull(input) { if (!input) return null; const d = new Date(input); return isNaN(d.getTime()) ? null : d; }
+    function setPeriodLabel(project) { const btn = document.getElementById('period-toggle'); if (!btn) return; const s = formatDateToMMDD(project.start_date); const e = formatDateToMMDD(project.deadline); if (!s && !e) { btn.textContent = '기간 선택'; return; } if (s && e) { btn.textContent = `${s} ~ ${e}`; return; } if (s) { btn.textContent = `${s} ~`; return; } { btn.textContent = `~ ${e}`; } }
     initializeApp();
 });
