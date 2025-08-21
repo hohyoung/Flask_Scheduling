@@ -258,6 +258,22 @@
         </div>
     </dialog>
 
+    <dialog id="schedule-modal">
+        <form id="schedule-form">
+            <h3>스케줄을 입력하세요</h3>
+            <select id="schedule-type-select" required>
+                <option value="personal">개인</option>
+                <option value="team">팀</option>
+                <option value="company">회사</option>
+            </select>
+            <input type="text" id="schedule-content-input" placeholder="상세 내용을 입력하세요" required />
+            <div class="form-buttons">
+                <button type="button" id="close-schedule-modal-btn" class="cancel-btn">취소</button>
+                <button type="submit">저장</button>
+            </div>
+        </form>
+    </dialog>
+
     <div id="toast-container" class="toast-container"></div>
 
     <!-- App JS -->

@@ -502,7 +502,7 @@ dialog::backdrop {
 /* --- 프로젝트 상세 팝업 --- */
 #details-modal {
     width: 90%;
-    max-width: 1400px;
+    max-width: 1800px;
     padding: 0;
 }
 
@@ -1313,4 +1313,39 @@ input.title-edit-input {
     border-right: none;
     margin-right: 0;
     padding-right: 0;
+}
+
+
+
+/* =================================
+   10. 스케줄 추가 팝업
+   ================================= */
+#schedule-modal {
+    width: 100%;
+    max-width: 450px;
+    padding: 30px;
+}
+
+#schedule-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+#schedule-form h3 {
+    text-align: center;
+    margin-top: 0;
+    margin-bottom: 10px;
+}
+
+/* 기존 폼 스타일 재사용 */
+#schedule-form select,
+#schedule-form input {
+    width: 100%;
+    padding: 12px;
+    box-sizing: border-box;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    font-size: 16px;
+    background-color: #f8f9fa;
 }

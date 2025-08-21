@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let sortable_tasks = null;
     let startDateCalendar = null; // <<-- 추가
     let deadlineCalendar = null;  // <<-- 추가
+    let newScheduleDate = null;
     let calendarFilters = {
         showDITeam: true,
         showProjects: true,
@@ -74,6 +75,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const categoryFiltersEl = document.getElementById('category-filters');
     const detailsModalTitleInput = document.getElementById('title-edit-input');
     const detailsUserSelect = document.getElementById('details-user-select');
+    const scheduleModal = document.getElementById('schedule-modal');
+    const scheduleForm = document.getElementById('schedule-form');
+    const closeScheduleModalBtn = document.getElementById('close-schedule-modal-btn');
 
 
 
@@ -498,7 +502,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (shouldShowTasks) {
                 project.tasks.forEach(task => {
                     if (task.deadline) {
-                        events.push({ title: `[업무] ${task.content}`, start: formatDateToYYYYMMDD(task.deadline), allDay: true, backgroundColor: '#6c757d' });
+                        events.push({ title: `[업무] ${task.content}`, start: formatDateToYYYYMMDD(task.deadline), allDay: true, backgroundColor: '#4895EF' });
                     }
                 });
             }
@@ -508,22 +512,39 @@ document.addEventListener('DOMContentLoaded', () => {
         if (calendarFilters.showSchedules) {
             (appData.schedules || []).forEach(schedule => {
                 if (calendarFilters.selectedUsers.has(schedule.user_id)) {
+
+                    // ▼▼▼ 제목(title) 생성 부분을 아래와 같이 수정합니다 ▼▼▼
+                    let scheduleTitlePrefix = '';
+                    switch (schedule.schedule_type) {
+                        case 'team':
+                            scheduleTitlePrefix = '[S DI 팀]';
+                            break;
+                        case 'company':
+                            scheduleTitlePrefix = '[S 수산]';
+                            break;
+                        case 'personal':
+                        default:
+                            scheduleTitlePrefix = `[S ${schedule.user_name}]`;
+                            break;
+                    }
+                    const eventTitle = `${scheduleTitlePrefix} ${schedule.content}`;
+
                     events.push({
                         id: `schedule-${schedule.id}`,
-                        title: `[S ${schedule.user_name}] ${schedule.content}`,
+                        title: eventTitle,
                         start: formatDateToYYYYMMDD(schedule.schedule_date),
                         allDay: true,
-                        backgroundColor: '#6f42c1',
-                        borderColor: '#6f42c1',
+                        backgroundColor: '#495057', // 스케줄 이벤트 색상
+                        borderColor: '#495057',
+                        // ▼▼▼ 이 부분을 추가/수정하세요 ▼▼▼
                         extendedProps: {
-                            type: 'schedule',
-                            scheduleId: schedule.id
+                            type: 'schedule', // 이 이벤트가 '스케줄' 타입임을 명시
+                            scheduleId: schedule.id // 삭제 시 사용할 스케줄의 실제 ID
                         }
                     });
                 }
             });
         }
-
         return events;
     }
 
@@ -537,7 +558,7 @@ document.addEventListener('DOMContentLoaded', () => {
             headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' },
             events: filteredEvents, // 필터링된 이벤트를 사용
             locale: 'ko',
-            height: '65vh',
+            height: '70vh',
             dateClick: handleDateClick,   // <<-- 날짜 클릭 핸들러 추가
             eventClick: handleEventClick  // <<-- 이벤트 클릭 핸들러 추가
         });
@@ -667,6 +688,13 @@ document.addEventListener('DOMContentLoaded', () => {
         editPostBtn.addEventListener('click', handleEditPostBtnClick);
         deletePostBtn.addEventListener('click', handleDeletePost);
         categoryFiltersEl.addEventListener('click', handleCategoryFilterClick);
+
+
+
+        // 스케줄
+        scheduleForm.addEventListener('submit', handleScheduleFormSubmit);
+        closeScheduleModalBtn.addEventListener('click', () => scheduleModal.close());
+        scheduleModal.addEventListener('click', (e) => { if (e.target === scheduleModal) scheduleModal.close(); });
 
         // '새 프로젝트' 팝업 상태 라디오 버튼
         projectModal.querySelectorAll('input[name="status"]').forEach(radio => {
@@ -1508,24 +1536,44 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 날짜 클릭 시 실행될 함수 (신규)
     function handleDateClick(arg) {
-        const content = prompt(`${arg.dateStr}에 추가할 일정을 입력하세요:`);
-        if (content && content.trim() !== '') {
-            createSchedule(content.trim(), arg.dateStr);
+        newScheduleDate = arg.dateStr; // 클릭된 날짜를 전역 변수에 저장
+        scheduleForm.reset();
+        scheduleModal.showModal();
+    }
+
+    // 새 스케줄 폼 제출 핸들러
+    async function handleScheduleFormSubmit(e) {
+        e.preventDefault();
+        // 1. 폼의 제출 버튼을 가져옵니다.
+        const submitBtn = scheduleForm.querySelector('button[type="submit"]');
+
+        const type = document.getElementById('schedule-type-select').value;
+        const content = document.getElementById('schedule-content-input').value.trim();
+
+        if (!content || !newScheduleDate) {
+            scheduleModal.close();
+            return;
+        }
+
+        try {
+            // 2. 버튼을 비활성화하고 텍스트를 변경합니다.
+            submitBtn.disabled = true;
+            submitBtn.textContent = '저장 중...';
+
+            await createSchedule(type, content, newScheduleDate);
+
+        } catch (error) {
+            // 에러가 발생해도 버튼은 활성화되어야 하므로 catch 블록은 비워둡니다.
+        } finally {
+            // 3. API 요청 성공/실패 여부와 관계없이 버튼을 다시 활성화합니다.
+            submitBtn.disabled = false;
+            submitBtn.textContent = '저장';
+            scheduleModal.close();
         }
     }
 
-    // 캘린더의 이벤트를 클릭했을 때 실행될 함수 (신규)
-    function handleEventClick(arg) {
-        // 개인 일정(schedule) 타입인 경우에만 삭제 로직 실행
-        if (arg.event.extendedProps.type === 'schedule') {
-            if (confirm(`'${arg.event.title}' 일정을 삭제하시겠습니까?`)) {
-                deleteSchedule(arg.event.extendedProps.scheduleId);
-            }
-        }
-    }
-
-    // 서버에 일정 생성을 요청하는 함수 (신규)
-    async function createSchedule(content, scheduleDate) {
+    // 서버에 일정 생성을 요청하는 함수 (수정됨)
+    async function createSchedule(type, content, scheduleDate) {
         try {
             const response = await fetch('/api/schedule', {
                 method: 'POST',
@@ -1533,20 +1581,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({
                     user_id: currentUser.id,
                     content: content,
-                    schedule_date: scheduleDate
+                    schedule_date: scheduleDate,
+                    schedule_type: type // 유형 정보 추가
                 })
             });
             if (!response.ok) throw new Error('Server error');
             const newSchedule = await response.json();
-            appData.schedules.push(newSchedule); // 로컬 데이터에 추가
-            initializeCalendar(); // 캘린더 새로고침
+            appData.schedules.push(newSchedule);
+            initializeCalendar();
             showToast('새로운 일정이 추가되었습니다.');
         } catch (error) {
             showToast('일정 추가에 실패했습니다.');
         }
     }
 
-    // 서버에 일정 삭제를 요청하는 함수 (신규)
+
+    // 캘린더의 이벤트를 클릭했을 때 실행될 함수 (신규)
+    function handleEventClick(arg) {
+        // ▼▼▼ extendedProps에서 데이터를 올바르게 조회하도록 수정합니다 ▼▼▼
+        if (arg.event.extendedProps && arg.event.extendedProps.type === 'schedule') {
+            if (confirm(`'${arg.event.title}' 일정을 삭제하시겠습니까?`)) {
+                deleteSchedule(arg.event.extendedProps.scheduleId);
+            }
+        }
+    }
+
+
+
+    // 서버에 일정 삭제를 요청하는 함수 (누락된 함수)
     async function deleteSchedule(scheduleId) {
         // 낙관적 UI 업데이트: 일단 화면에서 먼저 지움
         const originalSchedules = [...appData.schedules];
