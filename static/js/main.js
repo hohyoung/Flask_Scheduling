@@ -293,16 +293,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
         if (periodBtn && periodPopover && periodCloseBtn) {
-            
-
             // 팝오버는 기본 닫힘
             periodPopover.hidden = true;
 
             // 열릴 때만 달력 생성/갱신
             periodBtn.onclick = () => {
                 periodPopover.hidden = !periodPopover.hidden;
-                if (!periodPopover.hidden) renderPeriodCalendars(project);
+
+                // ▼▼▼ 팝오버가 열릴 때만 아래 로직이 실행되도록 수정 ▼▼▼
+                if (!periodPopover.hidden) {
+                    renderPeriodCalendars(project);
+
+                    // --- 이 코드를 periodBtn.onclick 안으로 이동시켰습니다 ---
+                    const clearDeadlineBtn = document.getElementById('clear-deadline-btn');
+                    if (clearDeadlineBtn) {
+                        clearDeadlineBtn.onclick = () => {
+                            handleDateChange('deadline', null); // 마감일을 null로 설정
+                            periodPopover.hidden = true; // 팝오버 닫기
+                        };
+                    }
+                }
             };
+
             periodCloseBtn.onclick = () => { periodPopover.hidden = true; };
 
             // 바깥 클릭으로 닫기(중복 등록 방지)
@@ -317,7 +329,6 @@ document.addEventListener('DOMContentLoaded', () => {
             document.addEventListener('click', detailsModal._periodOutsideClickHandler, true);
         }
 
-        
 
         // --- 4) 세부 업무 리스트 렌더링 (마감 지난 업무 강조) ---
         detailsTaskList.innerHTML = '';
@@ -751,11 +762,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!project || project[field] === newDate) return;
 
         // 시작일이 마감일보다 늦어지지 않도록 방어
-        if (field === 'start_date' && project.deadline && new Date(newDate) > new Date(project.deadline)) {
+        if (field === 'start_date' && newDate && project.deadline && new Date(newDate) > new Date(project.deadline)) {
             showToast('시작일은 마감일보다 늦을 수 없습니다.');
             return;
         }
-        if (field === 'deadline' && new Date(newDate) < new Date(project.start_date)) {
+        if (field === 'deadline' && newDate && new Date(newDate) < new Date(project.start_date)) {
             showToast('마감일은 시작일보다 빠를 수 없습니다.');
             return;
         }
@@ -763,7 +774,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const originalDate = project[field];
         project[field] = newDate;
 
-        setPeriodLabel(project); 
+        setPeriodLabel(project);
         renderDetailsModal(); // 캘린더 UI 즉시 업데이트
         renderAll(); // 메인 화면에도 반영
 
@@ -1564,5 +1575,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateProjectProgress(projectId) { const project = appData.projects.find(p => p.id === projectId); if (!project || project.tasks.length === 0) { if (project) project.progress = 0; return; } const totalProgress = project.tasks.reduce((sum, t) => sum + t.progress, 0); project.progress = Math.round(totalProgress / project.tasks.length); }
     function toValidDateOrNull(input) { if (!input) return null; const d = new Date(input); return isNaN(d.getTime()) ? null : d; }
     function setPeriodLabel(project) { const btn = document.getElementById('period-toggle'); if (!btn) return; const s = formatDateToMMDD(project.start_date); const e = formatDateToMMDD(project.deadline); if (!s && !e) { btn.textContent = '기간 선택'; return; } if (s && e) { btn.textContent = `${s} ~ ${e}`; return; } if (s) { btn.textContent = `${s} ~`; return; } { btn.textContent = `~ ${e}`; } }
+    function showToast(message) { const container = document.getElementById('toast-container'); if (!container) return; const toast = document.createElement('div'); toast.className = 'toast-message'; toast.textContent = message; container.appendChild(toast); setTimeout(() => { toast.remove(); }, 3000); }
     initializeApp();
 });

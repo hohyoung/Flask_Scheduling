@@ -16,5 +16,6 @@ __pycache__/
 Thumbs.db
 
 .env
-migration_add_position.py
+
 migration_add_schedule.py
+migrate_add_position.py

@@ -551,7 +551,7 @@ input.title-edit-input {
     display: flex;
     align-items: center;
     gap: 10px;
-    position: relative; 
+    position: relative;
 }
 
 .details-controls select,
@@ -1020,27 +1020,36 @@ input.title-edit-input {
     gap: 15px;
     align-items: flex-start;
 }
+
 .dual-calendar-container p {
     text-align: center;
     font-weight: 500;
     margin: 0 0 5px 0;
     font-size: 14px;
 }
-#start-date-calendar, #deadline-calendar {
-    width: 280px; /* 캘린더 크기 지정 */
-    font-size: 12px; /* 캘린더 내부 폰트 크기 축소 */
+
+#start-date-calendar,
+#deadline-calendar {
+    width: 280px;
+    /* 캘린더 크기 지정 */
+    font-size: 12px;
+    /* 캘린더 내부 폰트 크기 축소 */
 }
+
 /* FullCalendar 내부 스타일 오버라이드 */
 .dual-calendar-container .fc-header-toolbar {
     margin-bottom: 0.5em !important;
 }
+
 .dual-calendar-container .fc-toolbar-title {
     font-size: 1.2em !important;
 }
+
 .dual-calendar-container .fc-button {
     padding: 2px 6px !important;
     font-size: 12px !important;
 }
+
 /* 선택된 날짜 하이라이트 스타일 */
 .selected-date {
     background-color: #e7f0ff !important;
@@ -1048,63 +1057,82 @@ input.title-edit-input {
 }
 
 
-
-
-
-
-
-.period-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
+.period-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px;
+}
 
 .details-controls {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 /* 콤보/버튼 공통 룩&높이 */
 .details-controls select,
 .details-controls input[type="date"],
 .details-controls .period-btn {
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-  background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 20px;
-  padding: 8px 30px 8px 15px;   /* ← 이 패딩으로 콤보와 동일 높이 */
-  font-size: 14px;
-  font-weight: 500;
-  font-family: inherit;
-  cursor: pointer;
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23666' stroke-linecap='round' stroke-linejoin='round' stroke-width='2'%3e%3cpath d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  background-size: 12px;
-  color: var(--color-text);
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 20px;
+    padding: 8px 30px 8px 15px;
+    /* ← 이 패딩으로 콤보와 동일 높이 */
+    font-size: 14px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23666' stroke-linecap='round' stroke-linejoin='round' stroke-width='2'%3e%3cpath d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 12px;
+    color: var(--color-text);
 }
 
 .details-controls .period-btn:focus,
 .details-controls select:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(0,123,255,.15);
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, .15);
 }
 
 /* 기간 팝오버 위치/모양 */
-.period-popover{
-  position: absolute;
-  top: 44px; /* 헤더 라인 바로 아래 */
-  right: 30px; /* 우측 끝 맞춤: 필요하면 조정 */
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  padding: 12px;
-  box-shadow: 0 8px 30px rgba(0,0,0,.12);
-  z-index: 1000;
-  width: 620px;
+.period-popover {
+    position: absolute;
+    top: 44px;
+    /* 헤더 라인 바로 아래 */
+    right: 30px;
+    /* 우측 끝 맞춤: 필요하면 조정 */
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, .12);
+    z-index: 1000;
+    width: 620px;
 }
-.period-actions{display:flex;justify-content:flex-end;margin-top:8px;}
 
+.period-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px;
+}
+
+/* style.css 파일 하단에 추가 */
+.secondary-btn {
+    background-color: #6c757d;
+    /* 회색 계열 배경 */
+    color: white;
+    margin-right: 8px;
+    /* 버튼 사이 간격 */
+}
+
+.secondary-btn:hover {
+    background-color: #5a6268;
+}
 
 /* =================================
    7. 로딩 오버레이 (신규 추가)
