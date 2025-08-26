@@ -122,7 +122,8 @@ def init_db():
                     user_id INTEGER NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
                     content TEXT NOT NULL,
                     schedule_date DATE NOT NULL,
-                    schedule_type TEXT NOT NULL DEFAULT 'personal' -- 유형 저장을 위한 컬럼 추가
+                    schedule_type TEXT NOT NULL DEFAULT 'personal', -- 유형 저장을 위한 컬럼 추가
+                    schedule_time TIME
                 );
             """
             )

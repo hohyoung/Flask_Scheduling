@@ -9,6 +9,9 @@
     <!-- Libraries -->
     <script defer src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+
 
     <!-- Fonts -->
     <link rel="stylesheet" as="style" crossorigin
@@ -47,44 +50,83 @@
             </div>
         </header>
 
-        <section class="controls">
-            <button id="add-project-btn" aria-label="새 프로젝트 생성">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-                    <path d="M11 11V5h2v6h6v2h-6v6h-2v-6H5v-2h6z"></path>
-                </svg>
-                <span>새 프로젝트</span>
-            </button>
 
-            <div id="category-filters" class="category-filters" role="group" aria-label="카테고리 필터">
-                <button class="filter-btn active" data-category="전체">전체</button>
-                <button class="filter-btn" data-category="문서">문서</button>
-                <button class="filter-btn" data-category="개발">개발</button>
-                <button class="filter-btn" data-category="기타">기타</button>
-            </div>
-        </section>
 
         <div class="main-content">
-            <div id="project-list-wrapper">
-                <section id="active-projects-section" class="project-section">
-                    <h2>진행중인 프로젝트</h2>
-                    <main id="project-list" class="project-list"></main>
+
+            <div id="main-left-container">
+
+                <section class="controls">
+                    <button id="add-project-btn" aria-label="새 프로젝트 생성">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20"
+                            height="20">
+                            <path d="M11 11V5h2v6h6v2h-6v6h-2v-6H5v-2h6z"></path>
+                        </svg>
+                        <span>새 프로젝트</span>
+                    </button>
+
+                    <div id="category-filters" class="category-filters" role="group" aria-label="카테고리 필터">
+                        <button class="filter-btn active" data-category="전체">전체</button>
+                        <button class="filter-btn" data-category="문서">문서</button>
+                        <button class="filter-btn" data-category="개발">개발</button>
+                        <button class="filter-btn" data-category="기타">기타</button>
+                    </div>
                 </section>
 
-                <section id="scheduled-projects-section" class="project-section">
-                    <h2>프로젝트 예정</h2>
-                    <div id="scheduled-project-list" class="project-list"></div>
-                </section>
+                <div id="project-list-wrapper">
+                    <section id="active-projects-section" class="project-section">
+                        <h2>진행중인 프로젝트</h2>
+                        <main id="project-list" class="project-list"></main>
+                    </section>
 
-                <section id="completed-projects-section" class="project-section">
-                    <h2>종료된 프로젝트</h2>
-                    <div id="completed-project-list" class="project-list"></div>
-                </section>
+                    <section id="scheduled-projects-section" class="project-section">
+                        <h2>프로젝트 예정</h2>
+                        <div id="scheduled-project-list" class="project-list"></div>
+                    </section>
+
+                    <section id="completed-projects-section" class="project-section">
+                        <h2>종료된 프로젝트</h2>
+                        <div id="completed-project-list" class="project-list"></div>
+                    </section>
+                </div>
             </div>
 
-            <section id="calendar-container">
-                <div id="calendar"></div>
-                <div id="calendar-filters" class="calendar-filters"></div>
+            <section id="visualization-section">
+
+                <div id="visualization-toggles" class="category-filters">
+                    <button class="filter-btn active" data-view="load-calculation">부하 계산</button>
+                    <button class="filter-btn" data-view="calendar">캘린더</button>
+                </div>
+
+                <div id="visualization-content">
+                    <div id="load-calculation-view" class="visualization-view active">
+                        <div id="charts-wrapper">
+                            <div id="load-pie-chart-container" class="chart-container">
+                                <h3>팀원별 프로젝트 개수</h3>
+                                <canvas id="load-pie-chart"></canvas>
+                            </div>
+                            <div id="load-bar-chart-container" class="chart-container">
+                                <h3>팀원별 평균 진행도</h3>
+                                <canvas id="load-bar-chart"></canvas>
+                            </div>
+                        </div>
+                        <div id="chart-options">
+                            <label>
+                                <input type="checkbox" id="exclude-di-team-checkbox" checked>
+                                <span>DI 팀 제외</span>
+                            </label>
+                        </div>
+                        <div id="member-project-lists">
+                        </div>
+                    </div>
+
+                    <div id="calendar-view" class="visualization-view">
+                        <div id="calendar"></div>
+                        <div id="calendar-filters" class="calendar-filters"></div>
+                    </div>
+                </div>
             </section>
+
         </div>
     </div>
 
@@ -277,7 +319,7 @@
     <div id="toast-container" class="toast-container"></div>
 
     <!-- App JS -->
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 
 </html>
