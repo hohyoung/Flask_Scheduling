@@ -1395,6 +1395,7 @@ input.title-edit-input {
     padding: 20px 10px 0 10px;
     flex-shrink: 0;
     padding-top: 20px;
+    padding-bottom: 15px;
     /* 원하는 만큼 여백을 조절하세요 */
 }
 

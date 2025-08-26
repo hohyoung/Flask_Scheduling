@@ -426,6 +426,53 @@ export function renderLoadCalculationView() {
     });
 }
 
+/**
+ * '새 글 작성' 모달을 엽니다.
+ */
+export function openPostModalForNew() {
+    const modal = document.getElementById('post-modal');
+    const form = document.getElementById('post-form');
+    form.reset();
+    document.getElementById('post-modal-title').textContent = '새 글 작성';
+    document.getElementById('post-id-input').value = '';
+    modal.showModal();
+}
+
+/**
+ * 기존 글을 수정하기 위해 모달을 엽니다.
+ * @param {object} post - 수정할 게시글 데이터
+ */
+export function openPostModalForEdit(post) {
+    const modal = document.getElementById('post-modal');
+    document.getElementById('post-modal-title').textContent = '글 수정';
+    document.getElementById('post-id-input').value = post.id;
+    document.getElementById('post-title-input').value = post.title;
+    document.getElementById('post-content-textarea').value = post.content;
+    modal.showModal();
+}
+
+/**
+ * 게시글을 보기 위한 모달을 엽니다.
+ * @param {number} postId - 볼 게시글의 ID
+ */
+export function openPostViewModal(postId) {
+    state.currentOpenPostId = postId;
+    const post = state.appData.posts.find(p => p.id === postId);
+    if (!post) return;
+
+    document.getElementById('post-view-title').textContent = post.title;
+    document.getElementById('post-view-meta').textContent = `작성자: ${post.author_name} | 최종 수정: ${new Date(post.updated_at).toLocaleString()}`;
+    document.getElementById('post-view-body').textContent = post.content;
+
+    // 현재 사용자가 작성자인 경우에만 수정/삭제 버튼 표시
+    const isAuthor = state.currentUser && state.currentUser.id === post.user_id;
+    document.getElementById('edit-post-btn').style.display = isAuthor ? 'block' : 'none';
+    document.getElementById('delete-post-btn').style.display = isAuthor ? 'block' : 'none';
+
+    document.getElementById('post-view-modal').showModal();
+}
+
+
 
 // ===================================================================
 // 3. 캘린더 렌더링 (Calendar Rendering)
