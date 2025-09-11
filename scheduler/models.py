@@ -1,12 +1,26 @@
 from .db import db
 
-class User(db.Model):
+# Helper base class for serialization
+class SerializableModel(db.Model):
+    __abstract__ = True
+
+    def to_dict(self):
+        # This is a simple serialization. For complex cases, libraries like Marshmallow are better.
+        d = {}
+        for column in self.__table__.columns:
+            d[column.name] = getattr(self, column.name)
+        return d
+
+class User(SerializableModel):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(80), unique=True, nullable=False)
     position = db.Column(db.String(80))
 
-class Project(db.Model):
+    def to_dict(self):
+        return {'id': self.id, 'name': self.name, 'position': self.position}
+
+class Project(SerializableModel):
     __tablename__ = 'projects'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
@@ -20,7 +34,13 @@ class Project(db.Model):
     tasks = db.relationship('Task', backref='project', lazy=True, cascade="all, delete-orphan")
     comments = db.relationship('Comment', backref='project', lazy=True, cascade="all, delete-orphan")
 
-class Task(db.Model):
+    def to_dict(self):
+        d = super().to_dict()
+        d['tasks'] = [task.to_dict() for task in self.tasks]
+        d['comments'] = [comment.to_dict() for comment in self.comments]
+        return d
+
+class Task(SerializableModel):
     __tablename__ = 'tasks'
     id = db.Column(db.Integer, primary_key=True)
     project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
@@ -30,7 +50,7 @@ class Task(db.Model):
     is_current = db.Column(db.Integer, default=0)
     task_order = db.Column(db.Integer, default=0)
 
-class Comment(db.Model):
+class Comment(SerializableModel):
     __tablename__ = 'comments'
     id = db.Column(db.Integer, primary_key=True)
     project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
@@ -38,7 +58,7 @@ class Comment(db.Model):
     content = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now())
 
-class Post(db.Model):
+class Post(SerializableModel):
     __tablename__ = 'posts'
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(120), nullable=False)
@@ -47,13 +67,13 @@ class Post(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now())
     updated_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now(), onupdate=db.func.now())
 
-class PostReadStatus(db.Model):
+class PostReadStatus(SerializableModel):
     __tablename__ = 'post_read_status'
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), primary_key=True)
     post_id = db.Column(db.Integer, db.ForeignKey('posts.id'), primary_key=True)
     read_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now())
 
-class Schedule(db.Model):
+class Schedule(SerializableModel):
     __tablename__ = 'schedules'
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)

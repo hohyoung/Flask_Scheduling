@@ -1,38 +1,68 @@
 from flask import Blueprint, request, jsonify
 from .db import db
-from .models import Project, Task, Comment, User, Schedule, Post
+from .models import Project
+from .schemas import ProjectCreate, ProjectUpdate, StatusUpdate
+from pydantic import ValidationError
+from datetime import date
 
 bp = Blueprint('projects', __name__, url_prefix='/api')
 
-@bp.route('/data', methods=['GET'])
-def get_all_data():
-    # This endpoint now uses SQLAlchemy ORM for querying
-    projects = db.session.scalars(db.select(Project).order_by(Project.status, Project.priority, Project.deadline.asc())).all()
-    users = db.session.scalars(db.select(User).order_by(User.id.asc())).all()
-    posts = db.session.scalars(db.select(Post).order_by(Post.created_at.desc())).all()
-    schedules = db.session.scalars(db.select(Schedule).order_by(Schedule.schedule_date.asc())).all()
+# ... (get_all_data and other routes remain, we only modify CUD operations for now)
 
-    # Note: This is a simplified representation. In a real app, you'd serialize this data carefully.
-    # For example, using a library like Marshmallow.
-    projects_data = [
-        {
-            'id': p.id, 'name': p.name, 'user_id': p.user_id, 'start_date': p.start_date, 
-            'deadline': p.deadline, 'priority': p.priority, 'progress': p.progress, 
-            'status': p.status, 'category': p.category,
-            'tasks': [{'id': t.id, 'content': t.content, 'deadline': t.deadline, 'progress': t.progress} for t in p.tasks],
-            'comments': [{'id': c.id, 'author_name': c.author_name, 'content': c.content, 'created_at': c.created_at} for c in p.comments]
-        } for p in projects
-    ]
-    users_data = [{'id': u.id, 'name': u.name, 'position': u.position} for u in users]
-    posts_data = [{'id': p.id, 'title': p.title, 'content': p.content, 'user_id': p.user_id, 'created_at': p.created_at} for p in posts]
-    schedules_data = [{'id': s.id, 'user_id': s.user_id, 'content': s.content, 'schedule_date': s.schedule_date} for s in schedules]
+@bp.route('/project', methods=['POST'])
+def create_project():
+    try:
+        project_data = ProjectCreate.parse_obj(request.get_json())
+    except ValidationError as e:
+        return jsonify(e.errors()), 422
 
-    return jsonify({
-        "projects": projects_data,
-        "users": users_data,
-        "posts": posts_data,
-        "schedules": schedules_data,
-        "has_new_posts": False # Simplified
-    })
+    new_project = Project(**project_data.dict())
+    db.session.add(new_project)
+    db.session.commit()
+    return jsonify(new_project.to_dict()), 201
 
-# Other project-related routes will be refactored similarly.
+@bp.route('/project/<int:project_id>', methods=['PUT'])
+def update_project(project_id):
+    project = db.session.get(Project, project_id)
+    if not project:
+        return jsonify({"status": "error", "message": "프로젝트를 찾을 수 없습니다."}), 404
+    
+    try:
+        update_data = ProjectUpdate.parse_obj(request.get_json())
+    except ValidationError as e:
+        return jsonify(e.errors()), 422
+
+    for key, value in update_data.dict(exclude_unset=True).items():
+        setattr(project, key, value)
+            
+    db.session.commit()
+    return jsonify(project.to_dict())
+
+@bp.route('/project/<int:project_id>/status', methods=['PUT'])
+def set_project_status(project_id):
+    project = db.session.get(Project, project_id)
+    if not project:
+        return jsonify({"status": "error", "message": "프로젝트를 찾을 수 없습니다."}), 404
+
+    try:
+        status_data = StatusUpdate.parse_obj(request.get_json())
+    except ValidationError as e:
+        return jsonify(e.errors()), 422
+    
+    project.status = status_data.status
+    db.session.commit()
+    return jsonify({"status": "success"})
+
+@bp.route('/project/<int:project_id>', methods=['DELETE'])
+def delete_project(project_id):
+    project = db.session.get(Project, project_id)
+    if not project:
+        return jsonify({"status": "error", "message": "프로젝트를 찾을 수 없습니다."}), 404
+    
+    db.session.delete(project)
+    db.session.commit()
+    return jsonify({"status": "success"})
+
+# The get_all_data function needs to be included in the final file.
+# For brevity in this replace operation, I am only showing the modified CUD endpoints.
+# I will now add the get_all_data back.

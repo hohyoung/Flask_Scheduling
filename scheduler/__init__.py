@@ -46,8 +46,13 @@ def create_app(test_config=None):
     migrate = Migrate(app, db)
 
     # Register Blueprints
-    from . import projects
+    from . import projects, users, tasks, comments, posts, schedules
     app.register_blueprint(projects.bp)
+    app.register_blueprint(users.bp)
+    app.register_blueprint(tasks.bp)
+    app.register_blueprint(comments.bp)
+    app.register_blueprint(posts.bp)
+    app.register_blueprint(schedules.bp)
 
     # A simple route to test
     @app.route('/hello')
