@@ -50,10 +50,11 @@ window.handleTaskReorder = function (evt) {
 // 2. 이벤트 리스너 설정 (Event Listener Setup)
 // ===================================================================
 
+let areAppEventListenersSet = false;
+
 function setupEventListeners() {
-    // Auth
-    document.getElementById('login-form').addEventListener('submit', handleLogin);
-    document.getElementById('set-password-form').addEventListener('submit', handleSetPassword);
+    // 이 리스너들은 앱의 메인 UI가 렌더링 된 후 한 번만 설정되어야 합니다.
+    if (areAppEventListenersSet) return;
 
     // Header & User
     document.getElementById('current-user-icon').addEventListener('click', handleUserIconClick);
@@ -82,6 +83,8 @@ function setupEventListeners() {
     
     // Modals
     setupModalEventListeners();
+
+    areAppEventListenersSet = true;
 }
 
 function setupModalEventListeners() {
@@ -180,8 +183,7 @@ export async function refreshDataAndRender() {
     } catch (error) {
         console.error('데이터 갱신 실패:', error);
         ui.showToast(error.error || '데이터를 불러오는데 실패했습니다.');
-        // If data fetch fails due to auth, redirect to login
-        if (error.status === 401) {
+        if (error.status === 401 || (error.error && error.error === "Authentication required")) {
             document.getElementById('login-modal').showModal();
         }
     }
@@ -190,11 +192,15 @@ export async function refreshDataAndRender() {
 export async function initializeAppContent() {
     document.getElementById('loading-overlay')?.classList.remove('hidden');
     await refreshDataAndRender();
+    setupEventListeners(); // 메인 UI가 렌더링 된 후 리스너 설정
     document.getElementById('loading-overlay')?.classList.add('hidden');
 }
 
 async function checkLoginAndInitialize() {
-    setupEventListeners();
+    // 로그인 모달에 대한 리스너는 항상 먼저 설정
+    document.getElementById('login-form').addEventListener('submit', handleLogin);
+    document.getElementById('set-password-form').addEventListener('submit', handleSetPassword);
+
     document.getElementById('loading-overlay')?.classList.add('hidden');
     const loginModal = document.getElementById('login-modal');
     
