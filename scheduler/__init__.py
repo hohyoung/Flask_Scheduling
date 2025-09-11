@@ -1,8 +1,12 @@
 
 import os
-from flask import Flask
+from flask import Flask, jsonify
 from json import JSONEncoder
 from datetime import date, datetime
+from .config import Config  # Import Config
+from .db import db
+from flask_migrate import Migrate
+from flask_login import LoginManager
 
 class CustomJSONEncoder(JSONEncoder):
     def default(self, obj):
@@ -19,18 +23,10 @@ class CustomJSONEncoder(JSONEncoder):
 def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
     app.json_encoder = CustomJSONEncoder
-    
-    # Load environment variables from .env file
-    from dotenv import load_dotenv
-    load_dotenv()
 
-    app.config.from_mapping(
-        SECRET_KEY='dev',
-        SQLALCHEMY_DATABASE_URI=os.environ.get("DATABASE_URL"),
-    )
-
+    # Load config from config.py
     if test_config is None:
-        app.config.from_pyfile('config.py', silent=True)
+        app.config.from_object(Config)
     else:
         app.config.from_mapping(test_config)
 
@@ -39,24 +35,34 @@ def create_app(test_config=None):
     except OSError:
         pass
 
-    # Initialize database with SQLAlchemy and Flask-Migrate
-    from .db import db
-    from flask_migrate import Migrate
+    # Initialize extensions
     db.init_app(app)
-    migrate = Migrate(app, db)
+    Migrate(app, db)
+    login_manager = LoginManager()
+    login_manager.init_app(app)
+
+    from .models import User
+
+    @login_manager.user_loader
+    def load_user(user_id):
+        return User.query.get(int(user_id))
+
+    @login_manager.unauthorized_handler
+    def unauthorized():
+        return jsonify(error="Authentication required"), 401
 
     # Register Blueprints
-    from . import projects, users, tasks, comments, posts, schedules
+    from . import projects, users, tasks, comments, posts, schedules, auth
     app.register_blueprint(projects.bp)
     app.register_blueprint(users.bp)
     app.register_blueprint(tasks.bp)
     app.register_blueprint(comments.bp)
     app.register_blueprint(posts.bp)
     app.register_blueprint(schedules.bp)
+    app.register_blueprint(auth.bp)
 
-    # A simple route to test
-    @app.route('/hello')
-    def hello():
-        return 'Hello, World!'
+    # Initialize custom commands
+    from . import commands
+    commands.init_app(app)
 
     return app

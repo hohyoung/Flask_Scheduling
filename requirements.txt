@@ -12,3 +12,5 @@ MarkupSafe
 packaging
 Werkzeug
 waitress
+Flask-Login
+pytest

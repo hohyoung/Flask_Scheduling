@@ -81,6 +81,7 @@ export function renderCurrentUserIcon() {
  */
 export function renderUserPopup() {
     userPopupList.innerHTML = '';
+    // User switching list
     state.appData.users.forEach(user => {
         const li = document.createElement('li');
         li.dataset.userId = user.id;
@@ -95,10 +96,25 @@ export function renderUserPopup() {
                     ${!isDITeam ? `<span class="user-position" style="color: #6c757d; font-size: 0.9em; cursor: pointer; margin-left: 5px;">${positionText}</span>` : ''}
                 </span>
             </div>
-            ${!isDITeam ? `<button class="delete-user-btn" data-user-id="${user.id}">×</button>` : ''}
         `;
         userPopupList.appendChild(li);
     });
+
+    // Separator
+    const separator = document.createElement('hr');
+    separator.style.margin = '5px 0';
+    userPopupList.appendChild(separator);
+
+    // Logout button
+    const logoutLi = document.createElement('li');
+    logoutLi.id = 'logout-btn';
+    logoutLi.innerHTML = `
+        <div class="user-info">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 8px;"><path d="M5 22a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h8v2H6v16h7v2H5zm11-6-4-4 4-4 1.414 1.414L14.828 11H21v2h-6.172l2.586 2.586L16 16z"></path></svg>
+            <span>로그아웃</span>
+        </div>
+    `;
+    userPopupList.appendChild(logoutLi);
 }
 
 /**

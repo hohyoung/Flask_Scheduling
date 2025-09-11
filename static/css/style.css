@@ -1466,3 +1466,55 @@ input.title-edit-input {
     height: 16px;
     cursor: pointer;
 }
+
+/* =================================
+   12. Login Modal
+   ================================= */
+.login-modal {
+    width: 100%;
+    max-width: 400px;
+    padding: 30px;
+    text-align: center;
+}
+
+.login-modal form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.login-modal input {
+    width: 100%;
+    padding: 12px;
+    box-sizing: border-box;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    font-size: 16px;
+    background-color: #f8f9fa;
+}
+
+.login-modal button {
+    padding: 12px;
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.login-modal hr {
+    border: none;
+    border-top: 1px solid var(--color-border);
+    margin: 25px 0;
+}
+
+.error-message {
+    color: var(--priority-high);
+    font-size: 14px;
+    margin: -5px 0 5px 0;
+    min-height: 1.2em;
+}
+
+.success-message {
+    color: var(--priority-low);
+    font-size: 14px;
+    margin: -5px 0 5px 0;
+    min-height: 1.2em;
+}

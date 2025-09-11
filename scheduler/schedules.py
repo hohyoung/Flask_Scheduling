@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify
+from flask_login import login_required
 from .db import db
 from .models import Schedule
 from datetime import date
@@ -11,6 +12,7 @@ def _parse_date(val):
     except (TypeError, ValueError): return val
 
 @bp.route('/schedule', methods=['POST'])
+@login_required
 def create_schedule():
     data = request.get_json() or {}
     required = ["user_id", "content", "schedule_date"]
@@ -28,6 +30,7 @@ def create_schedule():
     return jsonify(new_schedule.to_dict()), 201
 
 @bp.route('/schedule/<int:schedule_id>', methods=['DELETE'])
+@login_required
 def delete_schedule(schedule_id):
     schedule = db.session.get(Schedule, schedule_id)
     if schedule:
