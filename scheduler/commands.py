@@ -20,7 +20,9 @@ def import_data_command():
     # User -> Post -> PostReadStatus
     # User -> Schedule
     
-    base_path = os.path.join(os.path.dirname(__file__), '..\..\tables')
+    # More robust way to find the project root and then the tables directory
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    base_path = os.path.join(project_root, 'tables')
 
     # Clear existing data to prevent duplicates
     db.session.execute(db.text('DELETE FROM post_read_status'))
