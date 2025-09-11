@@ -39,9 +39,11 @@ def create_app(test_config=None):
     except OSError:
         pass
 
-    # Initialize database
-    from . import db
+    # Initialize database with SQLAlchemy and Flask-Migrate
+    from .db import db
+    from flask_migrate import Migrate
     db.init_app(app)
+    migrate = Migrate(app, db)
 
     # Register Blueprints
     from . import projects, users, tasks, comments, posts, schedules
