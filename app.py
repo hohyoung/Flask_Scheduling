@@ -136,7 +136,7 @@ def init_db():
             ]
             psycopg2.extras.execute_batch(
                 cur,
-                "INSERT INTO Users(name) VALUES (%s) ON CONFLICT (name) DO NOTHING",
+                "INSERT INTO Users(name, position) VALUES (%s, %s) ON CONFLICT (name) DO NOTHING",
                 users,
             )
             print("Database initialized.")
